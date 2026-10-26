@@ -1,0 +1,284 @@
+note SPDX-License-Identifier: MIT OR GPL-2.0-only
+note boot: the GB10B GSP start-up (11 register steps) as a step machine. Omega decides every register
+note access; the kernel glue only performs the one action it is handed and calls again.
+note Port of aien-dev/aienux feat/own-gpu-driver c9678d7b native/kernel/gpu/gsp_mmio.c (the oracle,
+note same register order, checked on its simulator by tests/host/parity_boot.c). NVIDIA sources for
+note every step are cited in that file's header (open-gpu-kernel-modules 580.173.02, MIT):
+note 1 wait SEC2 EMEM channel 0 empty (QUEUE_HEAD == QUEUE_TAIL), 2-4 write the packet through EMEMC/EMEMD
+note with auto-increment and check the write pointer, 5 QUEUE_TAIL then QUEUE_HEAD (doorbell),
+note 6 wait SEC2 MAILBOX0 != 0xc001cafe, 7 wait GSP HWCFG2 mask released, 8 wait lockdown released or an
+note FMC code, 9 GSP MAILBOX0 must be 0, 10 FALCON_OS = appVersion, 11 RISC-V CPUCTL ACTIVE (bit 7).
+note
+note st (32 ulong, caller zeroes it and sets the inputs):
+note   0 pc (0 = start)  1 packet bytes 1..1024  2 FMC boot-argument address  3 appVersion
+note   4..7 poll budgets for steps 1, 6, 7, 8   8 poll counter   9 packet byte index   10 EMEM start
+note   11 SEC2 QUEUE_HEAD read in step 1
+note   12 stage: 0 ok, 1 arg, 2 busy, 3 emem, 4 sec2, 5 mask, 6 lockdown, 7 fmc, 8 riscv (C enum, sign dropped)
+note   13..16 polls used by steps 1, 6, 7, 8   17 dwords   18 EMEMC after   19 SEC2 MAILBOX0   20 SEC2 MAILBOX1
+note   21 HWCFG2   22 GSP MAILBOX0   23 GSP MAILBOX1   24 CPUCTL
+note act (4 ulong) written on result 0: 0 kind (1 read, 2 write, 3 pause between polls), 1 BAR0 offset,
+note   2 value to write. obs = the value the previous read returned (0 after a write or a pause).
+note Result: 0 = do act and call again, 1 = finished (st 12 holds the stage).
+note Register offsets (decimal of the hex in gsp_mmio.h, Wolfram FromDigits 2026-10-26):
+note SEC2 MAILBOX0 0x840040, MAILBOX1 0x840044, EMEMC0 0x840ac0, EMEMD0 0x840ac4, QHEAD0 0x840c00,
+note QTAIL0 0x840c04; GSP MAILBOX0 0x110040, MAILBOX1 0x110044, FALCON_OS 0x110080, HWCFG2 0x1100f4,
+note RISC-V CPUCTL 0x111388. EMEMC 16777216 bit 24 0x1000000, busy 0xc001cafe, locked 0xbadf4100 under
+note mask 0xffffff00, lockdown bit 13, active bit 7. omc befb8199 refuses `const` in function mode
+note (error 9 at end of input), so these appear below as decimal literals.
+fn bact act edit ulong 4 kind ulong off ulong val ulong to ulong
+put act 0 kind
+put act 1 off
+put act 2 val
+ret 0
+end
+fn bfin st edit ulong 32 stage ulong to ulong
+put st 12 stage
+put st 0 99
+ret 1
+end
+note EMEMC: block 15:8 times 64 dwords plus offset 7:2 (gsp_mmio.c emem_dwords).
+fn ememdw v ulong to ulong
+ret add mul and shr v 8 255 64 and shr v 2 63
+end
+note Little-endian dword of packet bytes i..i+3, zero beyond the packet length n.
+fn pword pkt view uchar 1024 i ulong n ulong to ulong
+w = ulong 0
+for k ulong 4
+if lt add i k n
+w = or w shl ulong get pkt add i k mul k 8
+end
+end
+ret w
+end
+note Step 1: SEC2 channel empty. pc 10 read HEAD, 11 read TAIL, 12 compare.
+fn bstep1 st edit ulong 32 obs ulong act edit ulong 4 to ulong
+pc = get st 0
+if eq pc 10
+put st 0 11
+ret bact act 1 8653824 0
+end
+if eq pc 11
+put st 11 obs
+put st 0 12
+ret bact act 1 8653828 0
+end
+n = get st 8
+if eq get st 11 obs
+put st 13 n
+put st 8 0
+put st 0 20
+ret 2
+end
+if ge n get st 4
+put st 13 n
+ret bfin st 2
+end
+put st 8 add n 1
+put st 0 10
+ret bact act 3 0 0
+end
+note Steps 2-5: packet into EMEM, write pointer check, TAIL then HEAD.
+fn bstep2 st edit ulong 32 pkt view uchar 1024 obs ulong act edit ulong 4 to ulong
+pc = get st 0
+if eq pc 20
+put st 0 21
+ret bact act 2 8653504 16777216
+end
+if eq pc 21
+put st 0 22
+ret bact act 1 8653504 0
+end
+if eq pc 22
+put st 10 ememdw obs
+put st 9 0
+put st 0 23
+end
+pc = get st 0
+n = get st 1
+i = get st 9
+if eq pc 23
+if lt i n
+put st 9 add i 4
+ret bact act 2 8653508 pword pkt i n
+end
+put st 0 25
+ret bact act 1 8653504 0
+end
+if eq pc 25
+dw = div add n 3 4
+put st 17 dw
+put st 18 obs
+if ne sub ememdw obs get st 10 dw
+ret bfin st 3
+end
+put st 0 26
+ret bact act 2 8653828 sub mul dw 4 4
+end
+put st 8 0
+put st 0 30
+ret bact act 2 8653824 0
+end
+note Step 6: SEC2 handled the command (MAILBOX0 no longer the busy pattern).
+fn bstep6 st edit ulong 32 obs ulong act edit ulong 4 to ulong
+pc = get st 0
+if eq pc 30
+put st 0 31
+ret bact act 1 8650816 0
+end
+if eq pc 32
+put st 20 obs
+ret bfin st 4
+end
+put st 19 obs
+n = get st 8
+if ne obs 3221342974
+put st 14 n
+put st 8 0
+put st 0 40
+ret 2
+end
+if ge n get st 5
+put st 14 n
+put st 0 32
+ret bact act 1 8650820 0
+end
+put st 8 add n 1
+put st 0 30
+ret bact act 3 0 0
+end
+note Step 7: GSP target mask released: HWCFG2 non-zero and not 0xbadf41xx.
+fn bstep7 st edit ulong 32 obs ulong act edit ulong 4 to ulong
+pc = get st 0
+if eq pc 40
+put st 0 41
+ret bact act 1 1114356 0
+end
+put st 21 obs
+n = get st 8
+if and ne obs 0 ne and obs 4294967040 3135193344
+put st 15 n
+put st 8 0
+put st 0 50
+ret 2
+end
+if ge n get st 6
+put st 15 n
+ret bfin st 5
+end
+put st 8 add n 1
+put st 0 40
+ret bact act 3 0 0
+end
+note Step 8 continued: not released yet; budget check, then pause or give up.
+fn bwait8 st edit ulong 32 act edit ulong 4 to ulong
+n = get st 8
+if ge n get st 7
+put st 16 n
+put st 0 56
+ret bact act 1 1114180 0
+end
+put st 8 add n 1
+put st 0 50
+ret bact act 3 0 0
+end
+note Step 8: lockdown released or an FMC code. MAILBOX0:MAILBOX1 equal to the FMC argument address
+note means not read yet (keep waiting, HWCFG2 not read on that pass, as the driver).
+fn bstep8 st edit ulong 32 obs ulong act edit ulong 4 to ulong
+pc = get st 0
+pa = get st 2
+if eq pc 50
+put st 0 51
+ret bact act 1 1114176 0
+end
+if eq pc 56
+put st 23 obs
+ret bfin st 6
+end
+if eq pc 51
+put st 22 obs
+if and ne obs 0 eq obs and pa 4294967295
+put st 0 52
+ret bact act 1 1114180 0
+end
+put st 0 53
+ret bact act 1 1114356 0
+end
+if eq pc 52
+put st 23 obs
+if eq obs shr pa 32
+ret bwait8 st act
+end
+put st 0 53
+ret bact act 1 1114356 0
+end
+put st 21 obs
+if or eq and obs 8192 0 ne get st 22 0
+put st 16 get st 8
+put st 0 60
+ret bact act 1 1114176 0
+end
+ret bwait8 st act
+end
+note Steps 9-11: FMC error check, FALCON_OS, RISC-V active.
+fn bstep9 st edit ulong 32 obs ulong act edit ulong 4 to ulong
+pc = get st 0
+if eq pc 60
+put st 22 obs
+if ne obs 0
+ret bfin st 7
+end
+put st 0 62
+ret bact act 2 1114240 and get st 3 4294967295
+end
+if eq pc 62
+put st 0 63
+ret bact act 1 1119112 0
+end
+put st 24 obs
+if eq and obs 128 0
+ret bfin st 8
+end
+ret bfin st 0
+end
+note Entry. Each call runs at most a few internal transitions (helpers return 2) before an action.
+fn agpu_boot_next st edit ulong 32 pkt view uchar 1024 obs ulong act edit ulong 4 to ulong
+if eq get st 0 0
+for k ulong 20
+put st add k 8 0
+end
+n = get st 1
+if or eq n 0 gt n 1024
+ret bfin st 1
+end
+put st 0 10
+end
+r = ulong 2
+while eq r 2 bound 8
+pc = get st 0
+if eq pc 99
+ret 1
+end
+if lt pc 20
+r = bstep1 st obs act
+else
+if lt pc 30
+r = bstep2 st pkt obs act
+else
+if lt pc 40
+r = bstep6 st obs act
+else
+if lt pc 50
+r = bstep7 st obs act
+else
+if lt pc 60
+r = bstep8 st obs act
+else
+r = bstep9 st obs act
+end
+end
+end
+end
+end
+end
+ret r
+end

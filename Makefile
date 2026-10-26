@@ -1,0 +1,83 @@
+# SPDX-License-Identifier: MIT OR GPL-2.0-only
+# aien-gpu: build the Omega units, check them, run the host tests, build the module.
+#   make om          compile om/*.om with the pinned omc, run tools/kcheck on every unit
+#   make host-test   unit tests and parity against the C oracles (aienux c9678d7b, fetched by pin)
+#   make kmod        build kmod/aien_gpu.ko against the running kernel's headers (never loads it)
+#   make check       om + host-test + kmod + static checks
+# OMC must be the seeded Omega compiler with the pinned sha256 below; nothing else is accepted.
+
+OMC ?= $(error set OMC=/path/to/omega-mv/seed/out/omc (sha256 $(OMC_SHA256)))
+OMC_SHA256 := befb8199db8c4bca188a494dfaac2a6f0ee5c36fcea11188c75666c55fce8a1d
+ORACLE_REPO := https://github.com/aien-dev/aienux.git
+ORACLE_REV := c9678d7b5286b15cfdb92a648264de6d3e9e72ac
+KDIR ?= /lib/modules/$(shell uname -r)/build
+B := build
+UNITS := ident boot seq seal mqput mqget abi
+CC ?= gcc
+HOSTCFLAGS := -std=gnu11 -O2 -g -Wall -Wextra -Werror -I tests/host
+
+.PHONY: om host-test kmod check static clean pin
+all: check
+
+$(B):
+	mkdir -p $(B)
+
+pin: | $(B)
+	@got=$$(sha256sum $(OMC) | cut -d' ' -f1); \
+	if [ "$$got" != "$(OMC_SHA256)" ]; then echo "OMC sha256 $$got, pinned $(OMC_SHA256): refused"; exit 1; fi; \
+	echo "omc pinned $$got" > $(B)/omc.pin
+
+$(B)/kcheck: tools/kcheck.om pin
+	$(OMC) < $< > $@.tmp && chmod +x $@.tmp && mv $@.tmp $@
+
+$(B)/%.bin: om/%.om $(B)/kcheck
+	$(OMC) < $< > $@.tmp || { rc=$$?; rm -f $@.tmp; echo "omc refused $< (status $$rc)"; exit 1; }
+	$(B)/kcheck < $@.tmp > $@.kcheck || { cat $@.kcheck; rm -f $@.tmp; exit 1; }
+	cat $@.kcheck
+	mv $@.tmp $@
+
+om: $(UNITS:%=$(B)/%.bin)
+
+# The trampoline object, assembled for the host from the very file the module uses.
+$(B)/agpu_om.o: kmod/agpu_om.S om
+	$(CC) -c -Wa,-I$(B) -o $@ $<
+
+ORACLE := $(B)/oracle
+$(ORACLE)/.rev:
+	rm -rf $(ORACLE)
+	git clone -q --filter=blob:none $(ORACLE_REPO) $(ORACLE)
+	git -C $(ORACLE) checkout -q $(ORACLE_REV)
+	git -C $(ORACLE) rev-parse HEAD > $@
+
+OGPU := $(ORACLE)/native/kernel/gpu
+ODEV := $(ORACLE)/native/kernel/dev
+OCFLAGS := -I $(OGPU) -I $(ODEV) -Wno-unused-parameter -Wno-sign-compare
+
+$(B)/parity_boot: tests/host/parity_boot.c $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(OGPU)/gsp_mmio.c $(OGPU)/gsp_sim.c $(B)/agpu_om.o
+
+$(B)/parity_seq: tests/host/parity_seq.c $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(OGPU)/gsp_seq.c $(B)/agpu_om.o
+
+$(B)/parity_mq: tests/host/parity_mq.c $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(ODEV)/gb10_gsp_boot.c $(B)/agpu_om.o
+
+$(B)/unit_test: tests/host/unit_test.c $(B)/agpu_om.o
+	$(CC) $(HOSTCFLAGS) -o $@ $< $(B)/agpu_om.o
+
+HOST_TESTS := unit_test parity_boot parity_seq parity_mq
+host-test: $(HOST_TESTS:%=$(B)/%)
+	@set -e; for t in $(HOST_TESTS); do ./$(B)/$$t; done
+	sh tests/host/kcheck_controls.sh $(B)/kcheck
+
+kmod: om
+	$(MAKE) -C kmod KDIR=$(KDIR) OMBUILD=$(abspath $(B))
+
+static: kmod
+	sh tools/static-checks.sh $(KDIR)
+
+check: om host-test kmod static
+
+clean:
+	rm -rf $(B)
+	$(MAKE) -C kmod clean KDIR=$(KDIR) || true

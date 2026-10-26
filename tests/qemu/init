@@ -1,0 +1,37 @@
+#!/bin/busybox sh
+# SPDX-License-Identifier: MIT OR GPL-2.0-only
+#
+# Guest /init for the aien-gpu QEMU harness. Runs one case script, dumps the
+# guest dmesg, prints exactly one verdict line
+#   AIEN-QEMU <case> PASS|FAIL <detail>
+# and powers off.
+/bin/busybox mkdir -p /proc /sys /dev /tmp /sbin /usr/bin /usr/sbin
+/bin/busybox --install -s
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+exec </dev/console >/dev/console 2>&1
+set -a
+. /aien/env
+set +a
+
+echo "AIEN-QEMU-BOOT $CASE uptime_s=$(cut -d' ' -f1 /proc/uptime) kernel=$(uname -r)"
+# Keep kernel chatter off the console while the case runs (panic/oops
+# messages are KERN_EMERG and still print); the full log is dumped below.
+dmesg -n 1
+echo "aien-qemu: case $CASE start" > /dev/kmsg
+
+rm -f /tmp/detail
+sh "/cases/$CASE.sh"
+rc=$?
+detail=$(head -n 1 /tmp/detail 2>/dev/null)
+[ -n "$detail" ] || detail="case script exited $rc without a detail"
+
+echo "AIEN-QEMU-DMESG-BEGIN"
+dmesg
+echo "AIEN-QEMU-DMESG-END"
+echo "AIEN-QEMU-TAINT $(cat /proc/sys/kernel/tainted)"
+if [ "$rc" -eq 0 ]; then v=PASS; else v=FAIL; fi
+echo "AIEN-QEMU $CASE $v $detail"
+sync
+poweroff -f
