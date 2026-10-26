@@ -12,7 +12,7 @@ ORACLE_REPO := https://github.com/aien-dev/aienux.git
 ORACLE_REV := c9678d7b5286b15cfdb92a648264de6d3e9e72ac
 KDIR ?= /lib/modules/$(shell uname -r)/build
 B := build
-UNITS := ident boot seq seal mqput mqget abi
+UNITS := ident boot seq seal mqput mqget abi gmmu memchk rpdes
 CC ?= gcc
 HOSTCFLAGS := -std=gnu11 -O2 -g -Wall -Wextra -Werror -I tests/host
 
@@ -62,6 +62,10 @@ $(B)/parity_seq: tests/host/parity_seq.c $(B)/agpu_om.o $(ORACLE)/.rev
 $(B)/parity_mq: tests/host/parity_mq.c $(B)/agpu_om.o $(ORACLE)/.rev
 	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(ODEV)/gb10_gsp_boot.c $(B)/agpu_om.o
 
+# om/gmmu.om, om/memchk.om, om/rpdes.om; the oracle gmmu.c is #included (its index math is static)
+$(B)/parity_gmmu: tests/host/parity_gmmu.c $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(B)/agpu_om.o
+
 $(B)/unit_test: tests/host/unit_test.c $(B)/agpu_om.o
 	$(CC) $(HOSTCFLAGS) -o $@ $< $(B)/agpu_om.o
 
@@ -72,7 +76,7 @@ $(B)/aien-gpu-boot: tools/aien-gpu-boot.c kmod/aien_gpu_uapi.h $(B)/agpu_om.o $(
 TOOLS := aien-gpu-boot
 tools: $(TOOLS:%=$(B)/%)
 
-HOST_TESTS := unit_test parity_boot parity_seq parity_mq
+HOST_TESTS := unit_test parity_boot parity_seq parity_mq parity_gmmu
 host-test: $(HOST_TESTS:%=$(B)/%) tools
 	@set -e; for t in $(HOST_TESTS); do ./$(B)/$$t; done
 	sh tests/host/kcheck_controls.sh $(B)/kcheck

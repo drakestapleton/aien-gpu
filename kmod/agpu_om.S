@@ -98,3 +98,6 @@ agpu_om_rt:				/* OscRt: 32 entries; offset 16 is trap */
 	OMUNIT	agpu_om_mqput, "mqput.bin"
 	OMUNIT	agpu_om_mqget, "mqget.bin"
 	OMUNIT	agpu_om_abi, "abi.bin"
+	OMUNIT	agpu_om_gmmu, "gmmu.bin"
+	OMUNIT	agpu_om_memchk, "memchk.bin"
+	OMUNIT	agpu_om_rpdes, "rpdes.bin"

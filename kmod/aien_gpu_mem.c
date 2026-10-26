@@ -392,7 +392,7 @@ int agpu_vas_create(struct agpu_file *f)
 	f->mem = m;
 	return 0;
 }
-	for (k = 0; !leak && o->pages && o->iova && k < o->npages && o->pages[k]; k++) {
+
 u64 agpu_vas_root_iova(struct agpu_file *f)
 {
 	return f->mem ? f->mem->root->iova : 0;
@@ -438,7 +438,7 @@ static void obj_free(struct agpu_dev *d, struct agpu_mobj *o, bool leak)
 {
 	u64 k;
 
-	for (k = 0; !leak && k < o->npages && o->pages[k]; k++) {
+	for (k = 0; !leak && o->pages && o->iova && k < o->npages && o->pages[k]; k++) {
 		if (o->iova[k])
 			dma_unmap_page(&d->pdev->dev, o->iova[k], PAGE_SIZE, DMA_BIDIRECTIONAL);
 		put_page(o->pages[k]);	/* a user mapping holds its own reference */
