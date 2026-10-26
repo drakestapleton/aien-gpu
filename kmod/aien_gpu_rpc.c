@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT OR GPL-2.0-only
 /*
- * aien_gpu_rpc.c -- the GSP message queues and the CPU sequencer. The Omega units decide (om/seal.om,
- * om/mqput.om, om/mqget.om, om/seq.om); this file only orders memory and touches registers.
+ * aien_gpu_rpc.c -- the GSP message queues and the CPU sequencer. The Omega units decide
+ * (om/seal.om, om/mqput.om, om/mqget.om, om/seq.om); this file only orders memory and touches
+ * registers.
  * Memory order, as message_queue_cpu.c (open-gpu-kernel-modules 580.173.02) does it:
  *   send: slots written -> dma_wmb() -> writePtr published -> GSP QUEUE_HEAD(0) = 0 (notify)
  *   recv: writePtr read -> dma_rmb() -> slots read -> dma_mb() -> our readPtr published
@@ -32,7 +33,8 @@ int agpu_mq_send(struct agpu_dev *d, u32 fn, u32 rpclen, u32 placed, u32 seq, u3
 	int rc;
 
 	*code = 0;
-	rc = agpu_om("seal", agpu_om_seal, (u64)d->msg_tx, fn, rpclen, placed, seq, d->tx_seq, &elems);
+	rc = agpu_om("seal", agpu_om_seal, (u64)d->msg_tx, fn, rpclen, placed, seq, d->tx_seq,
+		     &elems);
 	if (rc)
 		return rc;
 	if (elems >= AGPU_OM_FAIL) {
@@ -40,8 +42,8 @@ int agpu_mq_send(struct agpu_dev *d, u32 fn, u32 rpclen, u32 placed, u32 seq, u3
 		return -EINVAL;
 	}
 	/* GSP's read pointer of our command queue lives in the status queue */
-	rc = agpu_om("mqput", agpu_om_mqput, (u64)d->cmdq, (u64)d->msg_tx, elems, ld32(d->statq + MQ_RXHDR), 0, 0,
-		     &wr);
+	rc = agpu_om("mqput", agpu_om_mqput, (u64)d->cmdq, (u64)d->msg_tx, elems,
+		     ld32(d->statq + MQ_RXHDR), 0, 0, &wr);
 	if (rc)
 		return rc;
 	if (wr >= AGPU_OM_FAIL) {
@@ -64,7 +66,8 @@ int agpu_mq_recv(struct agpu_dev *d, u32 *code)
 
 	*code = 0;
 	dma_rmb();
-	rc = agpu_om("mqget", agpu_om_mqget, (u64)d->statq, (u64)d->msg_rx, rd, wr, d->rx_seq, 0, &elems);
+	rc = agpu_om("mqget", agpu_om_mqget, (u64)d->statq, (u64)d->msg_rx, rd, wr, d->rx_seq, 0,
+		     &elems);
 	if (rc)
 		return rc;
 	if (elems >= AGPU_OM_FAIL) {
@@ -94,7 +97,10 @@ static void bar_wr(void *ctx, u32 off, u32 v)
 	iowrite32(v, d->bar0 + off);
 }
 
-/* DELAY_US as asked, up to 1 s per operation (a longer request is a firmware bug we do not follow). */
+/*
+ * DELAY_US as asked, up to 1 s per operation (a longer request is a firmware bug we do not
+ * follow).
+ */
 static void bar_delay(void *ctx, u32 us)
 {
 	if (us <= 1000)
@@ -103,8 +109,10 @@ static void bar_delay(void *ctx, u32 us)
 		fsleep(min(us, 1000000u));
 }
 
-/* REG_POLL budget: reads after the first, about 1 us apart: 2 s, the order of NVIDIA's
- * GSP_SEQ_BUF_PAYLOAD_REG_POLL default timeout (kgspExecuteSequencerBuffer). */
+/*
+ * REG_POLL budget: reads after the first, about 1 us apart: 2 s, the order of NVIDIA's
+ * GSP_SEQ_BUF_PAYLOAD_REG_POLL default timeout (kgspExecuteSequencerBuffer).
+ */
 #define AGPU_SEQ_POLL_BUDGET 2000000u
 
 int agpu_seq_run(struct agpu_dev *d, u32 *code, u32 *ops_done)
@@ -115,7 +123,8 @@ int agpu_seq_run(struct agpu_dev *d, u32 *code, u32 *ops_done)
 
 	*code = 0;
 	*ops_done = 0;
-	rc = agpu_om("seq", agpu_om_seq, (u64)d->msg_rx, (u64)d->seq_ops, d->bar0_bytes, 0, 0, 0, &n);
+	rc = agpu_om("seq", agpu_om_seq, (u64)d->msg_rx, (u64)d->seq_ops, d->bar0_bytes, 0, 0, 0,
+		     &n);
 	if (rc)
 		return rc;
 	if (n >= AGPU_OM_FAIL) {

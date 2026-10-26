@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT OR GPL-2.0-only
 /*
- * aien-gpu: AIEN's own GB10 GPU driver (ledger L332). Linux glue only; every decision that is not
- * Linux plumbing is an Omega unit (the om directory, embedded by kmod/agpu_om.S, checked by tools/kcheck.om).
+ * aien-gpu: AIEN's own GB10 GPU driver (ledger L332). Linux glue only; every decision that is
+ * not Linux plumbing is an Omega unit (the om directory, embedded by kmod/agpu_om.S, checked by
+ * tools/kcheck.om).
  *
- * Binds the GB10 (10de:2e12) only with allow_bind=1, and only after om/ident.om accepts the PCI
- * function (stage 0, before any MMIO) and its identity registers (stage 1). Nothing is written to the
- * GPU until AGPU_BOOT. NVIDIA's kernel modules must be unloaded first: the PCI core never binds two
- * drivers to one device, and this driver never unbinds another.
+ * Binds the GB10 (10de:2e12) only with allow_bind=1, and only after om/ident.om accepts the
+ * PCI function (stage 0, before any MMIO) and its identity registers (stage 1). Nothing is
+ * written to the GPU until AGPU_BOOT. NVIDIA's kernel modules must be unloaded first: the PCI
+ * core never binds two drivers to one device, and this driver never unbinds another.
  * Status: IMPLEMENTED, host and QEMU tested; hardware NOT_RUN (docs/STATUS.md).
  */
 #include <linux/module.h>
@@ -39,7 +40,8 @@ module_param(selftest_trap, bool, 0444);
 MODULE_PARM_DESC(selftest_trap, "self-test also drives one Omega unit into a trap and checks it is contained");
 
 static struct agpu_dev g;		/* one GB10 per machine */
-static struct address_space *g_mapping;	/* /dev/aien-gpu's mapping, to revoke arena mappings at boot */
+/* /dev/aien-gpu's mapping, to revoke arena mappings at boot */
+static struct address_space *g_mapping;
 
 int agpu_om(const char *unit, const void *entry, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5,
 	    u64 *result)
@@ -112,9 +114,11 @@ static int agpu_selftest(void)
 	rc |= agpu_om("boot", agpu_om_boot, (u64)st, (u64)msg, 0, (u64)act, 0, 0, &r) ?:
 	      st_check("boot arg", r == 1 && st[12] == 1);
 	/* seal: one element; the folded XOR over the rounded length is then 0 */
-	rc |= agpu_om("seal", agpu_om_seal, (u64)msg, 10, 16, 16, 0, 0, &r) ?: st_check("seal", r == 1);
+	rc |= agpu_om("seal", agpu_om_seal, (u64)msg, 10, 16, 16, 0, 0, &r) ?:
+	      st_check("seal", r == 1);
 	if (!rc) {
-		u64 x = 0, w;
+		u64 x = 0;
+		__le64 w;
 
 		for (i = 0; i < 96; i += 8) {
 			memcpy(&w, msg + i, 8);
@@ -122,15 +126,20 @@ static int agpu_selftest(void)
 		}
 		rc |= st_check("seal checksum", ((u32)(x >> 32) ^ (u32)x) == 0);
 	}
-	/* mqput into an empty queue, then mqget on a queue whose header is GSP's shape and empty */
-	rc |= agpu_om("mqput", agpu_om_mqput, (u64)q, (u64)msg, 1, 0, 0, 0, &r) ?: st_check("mqput", r == 1);
+	/*
+	 * mqput into an empty queue, then mqget on a queue whose header is GSP's shape and
+	 * empty
+	 */
+	rc |= agpu_om("mqput", agpu_om_mqput, (u64)q, (u64)msg, 1, 0, 0, 0, &r) ?:
+	      st_check("mqput", r == 1);
 	memset(q, 0, 32);
 	st_put32(q + 4, AGPU_MQ_BYTES);
 	st_put32(q + 8, 4096);
 	st_put32(q + 12, 63);
 	st_put32(q + 24, 32);
 	st_put32(q + 28, 4096);
-	rc |= agpu_om("mqget", agpu_om_mqget, (u64)q, (u64)msg, 5, 5, 0, 0, &r) ?: st_check("mqget empty", r == 0);
+	rc |= agpu_om("mqget", agpu_om_mqget, (u64)q, (u64)msg, 5, 5, 0, 0, &r) ?:
+	      st_check("mqget empty", r == 0);
 	/* seq: one REG_WRITE of GSP QUEUE_HEAD(0) */
 	memset(msg, 0, 256);
 	st_put32(msg + 56, 32 + 40 + 16);
@@ -145,7 +154,10 @@ static int agpu_selftest(void)
 		u64 status = 0;
 		const u64 a[6] = { (u64)st, (u64)msg, 0, (u64)act, 0, 0 };
 
-		/* A state the driver never builds: packet index past the 1024-byte view, trap 3 (bounds). */
+		/*
+		 * A state the driver never builds: packet index past the 1024-byte view,
+		 * trap 3 (bounds).
+		 */
 		memset(st, 0, sizeof(st));
 		st[0] = 23; st[1] = 2000; st[9] = 1024;
 		r = agpu_om_enter(agpu_om_boot, a, &status);
@@ -175,8 +187,10 @@ static long agpu_info_ioctl(struct agpu_info __user *u)
 	return copy_to_user(u, &i, sizeof(i)) ? -EFAULT : 0;
 }
 
-/* Copy part of the boot arena out (GSP's log buffers after a start-up attempt). The range is checked
- * under the lock; the copy runs after it (the arena lives until remove). */
+/*
+ * Copy part of the boot arena out (GSP's log buffers after a start-up attempt). The range is
+ * checked under the lock; the copy runs after it (the arena lives until remove).
+ */
 static long agpu_arena_read_ioctl(struct agpu_arena_read __user *u)
 {
 	u8 blk[128] = { 0 };
@@ -189,8 +203,8 @@ static long agpu_arena_read_ioctl(struct agpu_arena_read __user *u)
 		return -EFAULT;
 	memcpy(blk, &a, sizeof(a));
 	mutex_lock(&g.lock);
-	rc = agpu_om("abi", agpu_om_abi, 2, (u64)blk, g.arena_iova, g.arena ? g.arena_bytes : 0, 0, 0,
-		     &verdict);
+	rc = agpu_om("abi", agpu_om_abi, 2, (u64)blk, g.arena_iova, g.arena ? g.arena_bytes : 0,
+		     0, 0, &verdict);
 	if (!rc && verdict)
 		rc = -EINVAL;
 	src = (u8 *)g.arena;
@@ -234,7 +248,8 @@ static long agpu_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		kvfree(k);
 		return -EFAULT;
 	}
-	if (cmd == AGPU_BOOT && g_mapping)	/* the arena is GSP's from now on: revoke user mappings */
+	/* the arena is GSP's from now on: revoke user mappings */
+	if (cmd == AGPU_BOOT && g_mapping)
 		unmap_mapping_range(g_mapping, AGPU_MMAP_ARENA, g.arena_bytes, 1);
 	mutex_lock(&g.lock);
 	switch (cmd) {
@@ -270,7 +285,7 @@ static int agpu_open(struct inode *inode, struct file *file)
 
 	if (!g.pdev)
 		return -ENODEV;
-	f = kzalloc(sizeof(*f), GFP_KERNEL);
+	f = kzalloc_obj(*f, GFP_KERNEL);
 	if (!f)
 		return -ENOMEM;
 	f->d = &g;
@@ -284,15 +299,18 @@ static int agpu_release(struct inode *inode, struct file *file)
 	struct agpu_file *f = file->private_data;
 
 	mutex_lock(&g.lock);
-	agpu_rm_file_release(f);	/* channels and RM objects first: GSP stops using the memory */
+	/* channels and RM objects first: GSP stops using the memory */
+	agpu_rm_file_release(f);
 	agpu_mem_file_release(f);
 	mutex_unlock(&g.lock);
 	kfree(f);
 	return 0;
 }
 
-/* Offset 0: the boot arena, root, only before the start-up. 1 << 40: the doorbell page.
- * 2 << 40 and up: memory objects. */
+/*
+ * Offset 0: the boot arena, root, only before the start-up. 1 << 40: the doorbell page.
+ * 2 << 40 and up: memory objects.
+ */
 static int agpu_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct agpu_file *f = file->private_data;
@@ -301,17 +319,16 @@ static int agpu_mmap(struct file *file, struct vm_area_struct *vma)
 	int rc;
 
 	mutex_lock(&g.lock);
-	if (off >= AGPU_MMAP_MEM_BASE) {
+	if (off >= AGPU_MMAP_MEM_BASE)
 		rc = agpu_mem_mmap(f, vma);
-	} else if (off == AGPU_MMAP_DOORBELL) {
+	else if (off == AGPU_MMAP_DOORBELL)
 		rc = agpu_doorbell_mmap(f, vma);
-	} else if (off != AGPU_MMAP_ARENA || !capable(CAP_SYS_ADMIN)) {
+	else if (off != AGPU_MMAP_ARENA || !capable(CAP_SYS_ADMIN))
 		rc = -EPERM;
-	} else if (g.info.state != AGPU_STATE_BOUND || len > g.arena_bytes || !g.arena) {
+	else if (g.info.state != AGPU_STATE_BOUND || len > g.arena_bytes || !g.arena)
 		rc = -EINVAL;
-	} else {
+	else
 		rc = dma_mmap_coherent(&g.pdev->dev, vma, g.arena, g.arena_iova, len);
-	}
 	mutex_unlock(&g.lock);
 	return rc;
 }
@@ -356,8 +373,11 @@ static void agpu_fw_check(struct pci_dev *pdev)
 static void agpu_free_mem(void)
 {
 	if (g.touched && (g.arena || g.heap)) {
-		/* GSP may still read and write these: never hand them back to Linux under a running DMA
-		 * master. Kept (leaked) until the reboot the window script does anyway. */
+		/*
+		 * GSP may still read and write these: never hand them back to Linux under a
+		 * running DMA master. Kept (leaked) until the reboot the window script does
+		 * anyway.
+		 */
 		dev_warn(&g.pdev->dev, "GSP was started: arena and heap kept until reboot\n");
 		g.arena = NULL;
 		g.heap = NULL;
@@ -389,13 +409,13 @@ static int agpu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		dev_info(&pdev->dev, "refusing: already bound to %s\n", pci_name(g.pdev));
 		return -EBUSY;
 	}
-	rc = agpu_om("ident", agpu_om_ident, pdev->vendor, pdev->device, pci_resource_len(pdev, 0), 0, 0, 0,
-		     &verdict);
+	rc = agpu_om("ident", agpu_om_ident, pdev->vendor, pdev->device, pci_resource_len(pdev, 0),
+		     0, 0, 0, &verdict);
 	if (rc)
 		return rc;
 	if (verdict) {
-		dev_info(&pdev->dev, "refusing %04x:%04x: not a GB10 (ident %llu)\n", pdev->vendor, pdev->device,
-			 verdict);
+		dev_info(&pdev->dev, "refusing %04x:%04x: not a GB10 (ident %llu)\n", pdev->vendor,
+			 pdev->device, verdict);
 		return -ENODEV;
 	}
 	rc = pcim_enable_device(pdev);
@@ -435,7 +455,8 @@ static int agpu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		g.arena = dma_alloc_coherent(&pdev->dev, g.arena_bytes, &g.arena_iova, GFP_KERNEL);
 	if (g.heap_bytes)
 		g.heap = dma_alloc_coherent(&pdev->dev, g.heap_bytes, &g.heap_iova, GFP_KERNEL);
-	if (!g.msg_tx || !g.msg_rx || !g.seq_ops || (g.arena_bytes && !g.arena) || (g.heap_bytes && !g.heap)) {
+	if (!g.msg_tx || !g.msg_rx || !g.seq_ops || (g.arena_bytes && !g.arena) ||
+	    (g.heap_bytes && !g.heap)) {
 		rc = -ENOMEM;
 		goto fail;
 	}
@@ -447,8 +468,10 @@ static int agpu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	rc = misc_register(&agpu_misc);
 	if (rc)
 		goto fail;
-	dev_info(&pdev->dev, "bound: BOOT_0 %08x BOOT_42 %08x BAR0 %llu bytes, arena %zu at %pad, heap %zu at %pad\n",
-		 g.info.boot0, g.info.boot42, g.bar0_bytes, g.arena_bytes, &g.arena_iova, g.heap_bytes, &g.heap_iova);
+	dev_info(&pdev->dev,
+		 "bound: BOOT_0 %08x BOOT_42 %08x BAR0 %llu bytes, arena %zu at %pad, heap %zu at %pad\n",
+		 g.info.boot0, g.info.boot42, g.bar0_bytes, g.arena_bytes, &g.arena_iova,
+		 g.heap_bytes, &g.heap_iova);
 	return 0;
 fail:
 	agpu_free_mem();

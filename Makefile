@@ -12,7 +12,7 @@ ORACLE_REPO := https://github.com/aien-dev/aienux.git
 ORACLE_REV := c9678d7b5286b15cfdb92a648264de6d3e9e72ac
 KDIR ?= /lib/modules/$(shell uname -r)/build
 B := build
-UNITS := ident boot seq seal mqput mqget abi
+UNITS := ident boot seq seal mqput mqget abi gmmu memchk rpdes rm rmchan rmctl rmchk rmarg
 CC ?= gcc
 HOSTCFLAGS := -std=gnu11 -O2 -g -Wall -Wextra -Werror -I tests/host
 
@@ -62,21 +62,51 @@ $(B)/parity_seq: tests/host/parity_seq.c $(B)/agpu_om.o $(ORACLE)/.rev
 $(B)/parity_mq: tests/host/parity_mq.c $(B)/agpu_om.o $(ORACLE)/.rev
 	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(ODEV)/gb10_gsp_boot.c $(B)/agpu_om.o
 
+# om/gmmu.om, om/memchk.om, om/rpdes.om; the oracle gmmu.c is #included (its index math is static)
+$(B)/parity_gmmu: tests/host/parity_gmmu.c $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(B)/agpu_om.o
+
+# om/rm.om, om/rmchan.om, om/rmctl.om, om/rmchk.om, om/rmarg.om: every payload byte against the real
+# NVIDIA 580.173.02 structs (MIT SDK headers, NVSRC) and the framing against the aienux oracle.
+NVSRC ?= $(HOME)/workspace/_ext/open-gpu-kernel-modules-580.173.02/src
+NVSDK := -I $(NVSRC)/common/sdk/nvidia/inc -I $(NVSRC)/common/sdk/nvidia/inc/ctrl -I $(NVSRC)/common/inc
+$(B)/parity_rm: tests/host/parity_rm.c $(B)/agpu_om.o $(ORACLE)/.rev
+	@test -f $(NVSRC)/common/sdk/nvidia/inc/alloc/alloc_channel.h || \
+		{ echo "NVSRC=$(NVSRC): open-gpu-kernel-modules 580.173.02 src/ not found"; exit 1; }
+	$(CC) $(HOSTCFLAGS) $(OCFLAGS) $(NVSDK) -o $@ $< $(ODEV)/gb10_gsp_boot.c $(B)/agpu_om.o
+
 $(B)/unit_test: tests/host/unit_test.c $(B)/agpu_om.o
 	$(CC) $(HOSTCFLAGS) -o $@ $< $(B)/agpu_om.o
 
-HOST_TESTS := unit_test parity_boot parity_seq parity_mq
-host-test: $(HOST_TESTS:%=$(B)/%)
+# stage B user-space tool: the aienux L192 package builder (recorded host dependency) + om/abi.om
+$(B)/aien-gpu-boot: tools/aien-gpu-boot.c kmod/aien_gpu_uapi.h $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) -I kmod -I $(ODEV) -Wno-unused-parameter -o $@ $< $(ODEV)/gb10_gsp_boot.c $(B)/agpu_om.o
+
+# CUDA++ m16 gate over /dev/aien-gpu (stage C); --dry-run needs no device
+$(B)/aien-gpu-m16: tools/aien-gpu-m16.c kmod/aien_gpu_uapi.h | $(B)
+	$(CC) $(HOSTCFLAGS) -I kmod -o $@ $<
+
+TOOLS := aien-gpu-boot aien-gpu-m16
+tools: $(TOOLS:%=$(B)/%)
+
+HOST_TESTS := unit_test parity_boot parity_seq parity_mq parity_gmmu parity_rm
+host-test: $(HOST_TESTS:%=$(B)/%) tools
 	@set -e; for t in $(HOST_TESTS); do ./$(B)/$$t; done
 	sh tests/host/kcheck_controls.sh $(B)/kcheck
+	sh tests/host/mutants.sh $(OMC) $(B)
+	sh tests/host/plan_test.sh $(ORACLE) $(B)
 
 kmod: om
 	$(MAKE) -C kmod KDIR=$(KDIR) OMBUILD=$(abspath $(B))
 
 static: kmod
-	sh tools/static-checks.sh $(KDIR)
+	OMBUILD=$(abspath $(B)) sh tools/static-checks.sh $(KDIR)
 
-check: om host-test kmod static
+QEMU_CASES := absent wrongdev nobind selftest-trap
+qemu-test: kmod
+	@set -e; for c in $(QEMU_CASES); do sh tests/qemu/run.sh kmod/aien_gpu.ko $$c; done
+
+check: om host-test kmod static qemu-test
 
 clean:
 	rm -rf $(B)

@@ -1,12 +1,13 @@
 /* SPDX-License-Identifier: MIT OR GPL-2.0-only */
 /*
  * agpu_exec.h -- the only register executor in aien-gpu. Omega units decide; this performs.
- * Shared, unchanged, by the kernel module (BAR0 via readl/writel) and the host tests (a simulator), so
- * the host tests exercise the code the module runs.
+ * Shared, unchanged, by the kernel module (BAR0 via readl/writel) and the host tests (a
+ * simulator), so the host tests exercise the code the module runs.
  *
- * agpu_seq_exec performs an operation list that om/seq.om has already checked end to end (opcodes,
- * payload sizes, register offsets inside BAR0, save indexes). REG_POLL reads until (v & mask) == val
- * with the same budget rule as the aienux oracle gsp_seq.c: budget reads after the first, at least one.
+ * agpu_seq_exec performs an operation list that om/seq.om has already checked end to end
+ * (opcodes, payload sizes, register offsets inside BAR0, save indexes). REG_POLL reads until
+ * (v & mask) == val with the same budget rule as the aienux oracle gsp_seq.c: budget reads after
+ * the first, at least one.
  * Core operations (reset, start, wait, resume of the GSP falcon) are refused with AGPU_SEQ_E_CORE:
  * they restart the chip, NVIDIA's source cannot tell what GSP-RM expects of them on GB10B, so they
  * wait for chip evidence instead of a guess.
@@ -16,21 +17,20 @@
 
 #ifdef __KERNEL__
 #include <linux/types.h>
-typedef u32 agpu_u32;
-typedef u64 agpu_u64;
 #else
-#include <stdint.h>
-typedef uint32_t agpu_u32;
-typedef uint64_t agpu_u64;
+/* the host tests: the compiler's own exact-width types, the same as <stdint.h> uses */
+typedef __UINT32_TYPE__ u32;
+typedef __UINT64_TYPE__ u64;
 #endif
 
 struct agpu_regio {
-	agpu_u32 (*rd)(void *ctx, agpu_u32 off);
-	void (*wr)(void *ctx, agpu_u32 off, agpu_u32 val);
-	void (*delay_us)(void *ctx, agpu_u32 us);
+	u32 (*rd)(void *ctx, u32 off);
+	void (*wr)(void *ctx, u32 off, u32 val);
+	void (*delay_us)(void *ctx, u32 us);
 	void *ctx;
-	agpu_u32 poll_budget;	/* reads allowed after the first one of a REG_POLL (0 counts as 1) */
-	agpu_u32 save[8];	/* REG_STORE results, GSP_SEQ_BUF_REG_SAVE_SIZE */
+	/* reads allowed after the first one of a REG_POLL (0 counts as 1) */
+	u32 poll_budget;
+	u32 save[8];	/* REG_STORE results, GSP_SEQ_BUF_REG_SAVE_SIZE */
 };
 
 enum {
@@ -40,14 +40,17 @@ enum {
 	AGPU_SEQ_E_OP = 3,	/* an opcode outside 0..8 (om/seq.om never passes one) */
 };
 
-/* ops: 6 words per operation (opcode, payload[5]) as om/seq.om writes them. *done = operations completed. */
-static inline int agpu_seq_exec(const agpu_u64 *ops, agpu_u32 n, struct agpu_regio *io, agpu_u32 *done)
+/*
+ * ops: 6 words per operation (opcode, payload[5]) as om/seq.om writes them.
+ * *done = operations completed.
+ */
+static inline int agpu_seq_exec(const u64 *ops, u32 n, struct agpu_regio *io, u32 *done)
 {
-	agpu_u32 i;
+	u32 i;
 
 	for (i = 0; i < n; i++) {
-		const agpu_u64 *o = ops + 6 * i;
-		agpu_u32 a = (agpu_u32)o[1], b = (agpu_u32)o[2], c = (agpu_u32)o[3];
+		const u64 *o = ops + 6 * i;
+		u32 a = (u32)o[1], b = (u32)o[2], c = (u32)o[3];
 
 		*done = i;
 		switch (o[0]) {
@@ -58,8 +61,8 @@ static inline int agpu_seq_exec(const agpu_u64 *ops, agpu_u32 n, struct agpu_reg
 			io->wr(io->ctx, a, (io->rd(io->ctx, a) & ~b) | c);
 			break;
 		case 2: {		/* REG_POLL addr mask val timeout error */
-			agpu_u32 left = io->poll_budget ? io->poll_budget : 1;
-			agpu_u32 v = io->rd(io->ctx, a);
+			u32 left = io->poll_budget ? io->poll_budget : 1;
+			u32 v = io->rd(io->ctx, a);
 
 			while ((v & b) != c) {
 				if (left == 0)

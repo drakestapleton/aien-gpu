@@ -88,6 +88,13 @@ static void test_abi(void)
 	good_boot(); w32(68, 60001); CHECK(abi(1) == 8);
 	good_boot(); blk[127] = 1; CHECK(abi(1) == 9);
 	good_boot(); blk[76] = 1; CHECK(abi(1) == 9);
+	/* request 2, AGPU_ARENA_READ: off 0, len 8 */
+	memset(blk, 0, sizeof(blk)); w64(8, 4096); CHECK(abi(2) == 0);
+	memset(blk, 0, sizeof(blk)); w64(0, ABYTES - 4096); w64(8, 4096); CHECK(abi(2) == 0);
+	memset(blk, 0, sizeof(blk)); w64(0, ABYTES - 4095); w64(8, 4096); CHECK(abi(2) == 10);
+	memset(blk, 0, sizeof(blk)); CHECK(abi(2) == 10);					/* empty */
+	memset(blk, 0, sizeof(blk)); w64(8, (16ull << 20) + 1); CHECK(abi(2) == 10);	/* > 16 MiB */
+	memset(blk, 0, sizeof(blk)); w64(0, ~0ull - 10); w64(8, 4096); CHECK(abi(2) == 10);	/* wrap */
 }
 
 /* Calls agpu_om_enter with x19..x28 set to known values and reads them back after. */

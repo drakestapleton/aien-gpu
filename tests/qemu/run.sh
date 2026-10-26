@@ -81,7 +81,7 @@ CASE='$CASE'
 MOD_KO='/aien/$MOD_FILE'
 MOD_NAME='$MOD_NAME'
 EOF
-(cd "$ROOT" && find . | LC_ALL=C sort | cpio -o -H newc -R 0:0 --quiet) | gzip -9 > "$INITRD"
+(cd "$ROOT" && find . | LC_ALL=C sort | cpio -o -H newc -R 0:0 --quiet) | nice -n 19 gzip -9 > "$INITRD"
 [ "${AIEN_QEMU_KEEP:-0}" = 1 ] || rm -rf "$ROOT"
 
 {
@@ -101,8 +101,9 @@ run_qemu() {
 	esac
 	: > "$LOG"
 	QRC=0
+	# Shared host: idle CPU and I/O priority (Spark host rule, 2026-10-26).
 	# shellcheck disable=SC2086 # cpu and CASE_ARGS are word lists by design
-	timeout -k 10 "$TIMEOUT_S" qemu-system-aarch64 \
+	nice -n 19 ionice -c3 timeout -k 10 "$TIMEOUT_S" qemu-system-aarch64 \
 		-M virt,gic-version=3 $cpu -smp 2 -m 1024 \
 		-nodefaults -no-reboot -display none -monitor none \
 		-serial "file:$LOG" \
