@@ -113,6 +113,17 @@ int main(int argc, char **argv)
 			plan_only = 1;
 			continue;
 		}
+		if (!strcmp(a, "--info")) {	/* AGPU_INFO as one line; touches nothing */
+			fd = open("/dev/aien-gpu", O_RDWR);
+			if (fd < 0 || ioctl(fd, AGPU_INFO, &info))
+				die(2, "NO-DEVICE", strerror(errno));
+			printf("AIEN_GPU_INFO: abi=%u state=%u boot0=%#x boot42=%#x bar0=%llu fw_bytes=%llu fw_ok=%u arena=%#llx@%#llx heap=%#llx@%#llx dma_bits=%u boot_attempts=%u\n",
+			       info.abi, info.state, info.boot0, info.boot42, (unsigned long long)info.bar0_bytes,
+			       (unsigned long long)info.fw_bytes, info.fw_ok, (unsigned long long)info.arena_bytes,
+			       (unsigned long long)info.arena_iova, (unsigned long long)info.heap_bytes,
+			       (unsigned long long)info.heap_iova, info.dma_bits, info.boot_attempts);
+			return 0;
+		}
 		if (!v)
 			die(2, "USAGE", a);
 		i++;
@@ -237,6 +248,20 @@ int main(int argc, char **argv)
 	if (ioctl(fd, AGPU_BOOT, &req))
 		die(2, "IOCTL-ERROR", strerror(errno));
 	out_bytes("boot-out.bin", &req.out, sizeof(req.out));
+	/* evidence, pass or fail: GSP-RM's log buffers and the RPC queues, copied out by AGPU_ARENA_READ
+	 * (the arena mapping was revoked when the start-up began) */
+	for (unsigned int i = 0; i <= GSP_GB10B_LOG_COUNT; i++) {
+		gsp_region r = i < GSP_GB10B_LOG_COUNT ? plan.log[i] : plan.rpc_shared;
+		struct agpu_arena_read rd = { r.pa - info.arena_iova, r.size, 0 };
+		uint8_t *buf = malloc(r.size ? r.size : 1);
+		char name[64];
+
+		rd.buf = (uint64_t)(uintptr_t)buf;
+		snprintf(name, sizeof(name), i < GSP_GB10B_LOG_COUNT ? "gsp-log-%u.bin" : "rpc-shared.bin", i);
+		if (buf && r.size && !ioctl(fd, AGPU_ARENA_READ, &rd))
+			out_bytes(name, buf, r.size);
+		free(buf);
+	}
 	printf("AIEN_GPU_BOOT: %s code=%u stage=%u polls=%u,%u,%u,%u sec2_mb0=%#x gsp_mb0=%#x cpuctl=%#x msgs=%u last_fn=%#x seq_runs=%u mmio_us=%llu wait_us=%llu\n",
 	       verdict_name(req.out.verdict), req.out.code, req.out.stage, req.out.polls[0], req.out.polls[1],
 	       req.out.polls[2], req.out.polls[3], req.out.sec2_mb0, req.out.gsp_mb0, req.out.cpuctl, req.out.msgs,

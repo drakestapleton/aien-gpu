@@ -26,7 +26,8 @@ guest `dmesg` between `AIEN-QEMU-DMESG-BEGIN/END`, the guest taint value and
 the guest's own verdict line.
 
 Guest: `-M virt,gic-version=3 -enable-kvm -cpu host -smp 2 -m 1024
--nodefaults -no-reboot`, kernel cmdline `console=ttyAMA0 panic=-1
+-nodefaults -no-reboot`, run under `nice -n 19 ionice -c3` (the Spark is
+shared), kernel cmdline `console=ttyAMA0 panic=-1
 oops=panic`. An oops panics the guest and QEMU exits without a verdict
 line, which counts as FAIL. If KVM cannot start (qemu exits before
 `Booting Linux`), the run retries under TCG `-cpu max` and reports
@@ -68,3 +69,29 @@ after the case starts. It also fails on any new D/W/B/L taint bit.
   "did not touch the device" but not sufficient: config-space reads are
   not observed.
 - A PASS here is EXERCISED in QEMU. It is not hardware qualification.
+
+## Host code record
+
+This harness is first-party POSIX shell, not Omega. It is test glue around
+verification oracles and is not in the module's build or production path.
+
+| file | runs on | job |
+|---|---|---|
+| `run.sh` | host | builds the initramfs, runs qemu, parses the verdict |
+| `fetch-kernel.sh` | host | fetches and checks the kernel image |
+| `init`, `cases/*.sh` | guest, busybox `sh` | load the module and check the outcome |
+
+The external tools it uses, at the versions exercised on 2026-10-26:
+
+- qemu-system-aarch64 8.2.2
+- busybox (Ubuntu static build, `/usr/bin/busybox`)
+- coreutils `timeout`
+- cpio, gzip
+- kmod `modinfo`
+- apt-get and dpkg-deb
+
+Omega successor: none scheduled, and there is no omega-mv PR. A port would
+need seeded Omega to emit a static AArch64 Linux executable for the guest
+`/init` and the case checks, plus process, file and syscall words for the
+host runner. Whether the pinned compiler (omega-mv 3364a1df) can already
+do this has not been assessed.

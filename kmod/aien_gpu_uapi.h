@@ -110,7 +110,13 @@ struct agpu_rm_init {
 	__u32 vgx_major, vgx_minor;	/* what GSP-RM answered */
 	__u32 h_client, h_device, h_subdevice;	/* GSP-RM's internal handles (static info 1728..1736) */
 	__u32 gr_runlist;		/* runlist id of GR0 (FIFO device info table) */
-	__u32 reserved[8];
+	__u32 num_channels;		/* INTERNAL_FIFO_GET_NUM_CHANNELS */
+	__u32 fault_mthd_bytes;		/* CE fault-method-buffer size */
+	__u32 gr_main_ctx_bytes;	/* GR main context buffer size */
+	__u32 max_subctx;		/* subcontexts per TSG */
+	__u32 compute_class;		/* compute class from the class list (not assumed) */
+	__u32 gpfifo_class;		/* GPFIFO class from the class list */
+	__u32 reserved[2];
 	__u8 static_info[1792];		/* GspStaticConfigInfo as received, for the evidence */
 };
 
@@ -133,8 +139,9 @@ struct agpu_mem_free {
 	struct agpu_rm_status st;
 };
 
-/* AGPU_CHAN_CREATE: one compute channel (TSG, context share, GPFIFO channel, BLACKWELL_COMPUTE_B,
- * scheduled). Ring and USERD live in caller memory from AGPU_MEM_ALLOC (GPU-uncached). */
+/* AGPU_CHAN_CREATE: one compute channel (TSG, context share, GPFIFO channel, the compute object of
+ * the class GSP-RM lists, scheduled). Ring and USERD live in caller memory from AGPU_MEM_ALLOC
+ * (GPU-uncached). */
 struct agpu_chan_create {
 	__u32 ring_handle;	/* memory holding the GPFIFO ring */
 	__u32 entries;		/* ring entries, power of two, 8..65536 */
@@ -146,7 +153,7 @@ struct agpu_chan_create {
 	__u32 token;		/* out: work-submit token, (runlist << 16) | chid */
 	__u64 doorbell_off;	/* out: mmap offset of the 64 KiB usermode page; doorbell word at +0x90 */
 	__u32 channel;		/* out: handle for AGPU_CHAN_DESTROY */
-	__u32 reserved;
+	__u32 compute_class;	/* out: the compute class allocated (use it for SET_OBJECT) */
 	struct agpu_rm_status st;
 };
 

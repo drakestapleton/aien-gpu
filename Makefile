@@ -65,18 +65,31 @@ $(B)/parity_mq: tests/host/parity_mq.c $(B)/agpu_om.o $(ORACLE)/.rev
 $(B)/unit_test: tests/host/unit_test.c $(B)/agpu_om.o
 	$(CC) $(HOSTCFLAGS) -o $@ $< $(B)/agpu_om.o
 
+# stage B user-space tool: the aienux L192 package builder (recorded host dependency) + om/abi.om
+$(B)/aien-gpu-boot: tools/aien-gpu-boot.c kmod/aien_gpu_uapi.h $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) -I kmod -I $(ODEV) -Wno-unused-parameter -o $@ $< $(ODEV)/gb10_gsp_boot.c $(B)/agpu_om.o
+
+TOOLS := aien-gpu-boot
+tools: $(TOOLS:%=$(B)/%)
+
 HOST_TESTS := unit_test parity_boot parity_seq parity_mq
-host-test: $(HOST_TESTS:%=$(B)/%)
+host-test: $(HOST_TESTS:%=$(B)/%) tools
 	@set -e; for t in $(HOST_TESTS); do ./$(B)/$$t; done
 	sh tests/host/kcheck_controls.sh $(B)/kcheck
+	sh tests/host/mutants.sh $(OMC) $(B)
+	sh tests/host/plan_test.sh $(ORACLE) $(B)
 
 kmod: om
 	$(MAKE) -C kmod KDIR=$(KDIR) OMBUILD=$(abspath $(B))
 
 static: kmod
-	sh tools/static-checks.sh $(KDIR)
+	OMBUILD=$(abspath $(B)) sh tools/static-checks.sh $(KDIR)
 
-check: om host-test kmod static
+QEMU_CASES := absent wrongdev nobind selftest-trap
+qemu-test: kmod
+	@set -e; for c in $(QEMU_CASES); do sh tests/qemu/run.sh kmod/aien_gpu.ko $$c; done
+
+check: om host-test kmod static qemu-test
 
 clean:
 	rm -rf $(B)
