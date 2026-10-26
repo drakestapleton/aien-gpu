@@ -39,7 +39,8 @@ make OMC=/path/to/omega-mv/seed/out/omc check   # om, kcheck, host tests, mutant
 ```
 
 `OMC` must be the seeded compiler with sha256
-`befb8199db8c4bca188a494dfaac2a6f0ee5c36fcea11188c75666c55fce8a1d` (omega-mv main `3364a1df`).
+`189ada82e00bb440cb41351bd252cc68c54a1b1050051cc42a1df700081c3b54` (omega-mv main `91b3c932`; requalified
+2026-10-26: every unit `KCHECK PASS`, all host gates, mutants 57/57, module build, QEMU cases).
 The test oracles are the earlier C of this work, fetched by pin from aien-dev/aienux `c9678d7b`.
 
 ## Licence

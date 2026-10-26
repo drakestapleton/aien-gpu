@@ -67,7 +67,8 @@ layouts (`docs/STAGE-C.md`).
 Question asked: can the pinned Omega compiler emit a relocatable AArch64 object that links into a
 kernel module? Answer, with evidence from this repository:
 
-- `omc` (omega-mv main 3364a1df, sha256 befb8199...) has two outputs: a whole static Linux program
+- `omc` (omega-mv main 3364a1df, sha256 befb8199..., and since the requalification omega-mv 91b3c932,
+  sha256 189ada82...) has two outputs: a whole static Linux program
   (program mode) and, for a unit without `fn main`, bare function words (function mode, OMEGESE 9.1).
   It does not write an ELF relocatable object. It does not need to: function-mode words are
   position independent (only PC-relative branches; `const`, `global`, `text` and host words are refused
