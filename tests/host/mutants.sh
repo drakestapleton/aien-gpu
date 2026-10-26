@@ -13,11 +13,15 @@ T=$(mktemp -d /tmp/agpu-mut.XXXXXX)
 trap 'rm -rf "$T"' EXIT
 ORACLE=$B/oracle/native/kernel
 CF="-std=gnu11 -O2 -I $ROOT/tests/host -I $ORACLE/gpu -I $ORACLE/dev -Wno-unused-parameter"
+# parity_rm compiles NVIDIA's 580.173.02 SDK headers (Makefile NVSRC)
+NVSRC=${NVSRC:-$HOME/workspace/_ext/open-gpu-kernel-modules-580.173.02/src}
+CF="$CF -I $NVSRC/common/sdk/nvidia/inc -I $NVSRC/common/sdk/nvidia/inc/ctrl -I $NVSRC/common/inc"
 srcs() { # test -> extra C sources
 	case $1 in
 	parity_boot) echo "$ORACLE/gpu/gsp_mmio.c $ORACLE/gpu/gsp_sim.c" ;;
 	parity_seq) echo "$ORACLE/gpu/gsp_seq.c" ;;
 	parity_mq) echo "$ORACLE/dev/gb10_gsp_boot.c" ;;
+	parity_rm) echo "$ORACLE/dev/gb10_gsp_boot.c" ;;
 	*) echo "" ;;
 	esac
 }
@@ -74,6 +78,31 @@ memchk|parity_gmmu|if eq n 256|if eq n 255
 rpdes|parity_gmmu|sz = 16|sz = 4096
 rpdes|parity_gmmu|ap = add 3 get lv 5|ap = add 2 get lv 5
 rpdes|parity_gmmu|put p 32 uchar 5|put p 32 uchar 6
+rm|parity_rm|p32 m 84 19|p32 m 84 20
+rm|parity_rm|p32 m 116 h|p32 m 116 0
+rm|parity_rm|ahdr m get a 0 get a 1 get a 2 41068 20|ahdr m get a 0 get a 1 get a 2 41069 20
+rm|parity_rm|p32 m 116 1|p32 m 116 3
+rm|parity_rm|ch4 m 360 114 101 108 47|ch4 m 360 114 101 108 46
+rmchan|parity_rm|shl div c 8 12 2097152|shl div c 8 12 1048576
+rmchan|parity_rm|mdesc m 304 get a 12 512 0|mdesc m 304 get a 12 4096 0
+rmchan|parity_rm|p32 m 356 or get a 21 28|p32 m 356 or get a 21 12
+rmchan|parity_rm|if gt get a 7 4095|if gt get a 7 4096
+rmctl|parity_rm|p32 m add o 24 add 5 get a add i 3|p32 m add o 24 add 4 get a add i 3
+rmctl|parity_rm|p32 m 200 2|p32 m 200 1
+rmctl|parity_rm|p32 m 88 2431713542|p32 m 88 2416967942
+rmctl|parity_rm|put m 120 1|put m 120 0
+rmctl|parity_rm|o = add 168 mul k 32|o = add 160 mul k 32
+rmchk|parity_rm|if or ne get a 0 43 ne get a 1 19|if or ne get a 0 43 ne get a 1 20
+rmchk|parity_rm|c = r32 m 1808|c = r32 m 1804
+rmchk|parity_rm|if and eq ed m i 2 1 ne ed m i 12 0|if and eq ed m i 2 1 ne ed m i 12 1
+rmchk|parity_rm|mul 4096 ms|mul 2048 ms
+rmchk|parity_rm|if or eq c 52928 and eq c 52672 eq get a 0 0|if eq c 52928
+rmchk|parity_rm|s = r32 m 96|s = r32 m 92
+rmchk|parity_rm|if gt get a 1 63|if gt get a 1 64
+rmarg|parity_rm|ret or shl get a 0 16 get a 1|ret or shl get a 0 15 get a 1
+rmarg|parity_rm|while lt c n bound 4096|while le c n bound 4096
+rmarg|parity_rm|if eq get a 0 2147483648|if eq get a 0 2147483649
+rmarg|parity_rm|ret and shr get a 0 4 1|ret and shr get a 0 3 1
 EOF
 if [ "$killed" -ne "$total" ]; then echo "MUTANTS FAIL killed=$killed/$total"; exit 1; fi
 echo "MUTANTS PASS killed=$killed/$total"

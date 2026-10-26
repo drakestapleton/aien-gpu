@@ -101,3 +101,8 @@ agpu_om_rt:				/* OscRt: 32 entries; offset 16 is trap */
 	OMUNIT	agpu_om_gmmu, "gmmu.bin"
 	OMUNIT	agpu_om_memchk, "memchk.bin"
 	OMUNIT	agpu_om_rpdes, "rpdes.bin"
+	OMUNIT	agpu_om_rm, "rm.bin"
+	OMUNIT	agpu_om_rmchan, "rmchan.bin"
+	OMUNIT	agpu_om_rmctl, "rmctl.bin"
+	OMUNIT	agpu_om_rmchk, "rmchk.bin"
+	OMUNIT	agpu_om_rmarg, "rmarg.bin"

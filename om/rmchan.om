@@ -1,7 +1,8 @@
 note SPDX-License-Identifier: MIT OR GPL-2.0-only
 note rmchan: build GSP_RM_ALLOC of the GPFIFO channel (NV_CHANNEL_ALLOC_PARAMS, 368 bytes) into the
 note staging buffer at byte 80 (op 9 of om/rm.om, a unit of its own for the kcheck stack budget).
-note Call: agpu_rm_chan m a; same contract and refusal codes as om/rm.om. Decimal constants (Wolfram):
+note Call: agpu_rm_chan op m a (op 9 only); same contract and refusal codes as om/rm.om.
+note Decimal constants (Wolfram):
 note 4294967295 = 0xffffffff, 2097152 = 1 << 21 (NVOS04_FLAGS_CHANNEL_USERD_INDEX_PAGE_FIXED_TRUE).
 fn p32 m edit uchar 65536 o ulong v ulong to void
 put m o uchar and v 255
@@ -149,6 +150,9 @@ ahdr m get a 0 get a 1 get a 2 get a 3 368
 chanput m a
 ret done a 103 32 400
 end
-fn agpu_rm_chan m edit uchar 65536 a edit ulong 64 to ulong
+fn agpu_rm_chan op ulong m edit uchar 65536 a edit ulong 64 to ulong
+if ne op 9
+ret 1000001
+end
 ret achan m a
 end

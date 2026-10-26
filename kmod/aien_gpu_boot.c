@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR GPL-2.0-only
 /*
- * aien_gpu_boot.c -- stage B: start NVIDIA's signed GSP-RM on the GB10 with our code, then wait for it
- * to report INIT_DONE, running any CPU-sequencer request it sends on the way.
- * The boot package (GSP-RM image, radix3, WPR metadata, FMC arguments, the SEC2 COT packet, queues) is
- * built into the arena by user space (tools/aien-gpu-boot) before this call; om/abi.om checks the
- * block that describes it. om/boot.om decides every register access of the 11 start-up steps; this
- * file performs them on BAR0 one at a time. One attempt per module load: a failed start-up is never
- * retried without a reset.
+ * aien_gpu_boot.c -- stage B: start NVIDIA's signed GSP-RM on the GB10 with our code, then wait
+ * for it to report INIT_DONE, running any CPU-sequencer request it sends on the way.
+ * The boot package (GSP-RM image, radix3, WPR metadata, FMC arguments, the SEC2 COT packet,
+ * queues) is built into the arena by user space (tools/aien-gpu-boot) before this call;
+ * om/abi.om checks the block that describes it. om/boot.om decides every register access of the
+ * 11 start-up steps; this file performs them on BAR0 one at a time. One attempt per module load:
+ * a failed start-up is never retried without a reset.
  */
 #include <linux/io.h>
 #include <linux/delay.h>
@@ -27,11 +27,15 @@ static u64 blk64(const u8 *b, unsigned int o)
 	return blk32(b, o) | (u64)blk32(b, o + 4) << 32;
 }
 
-/* The 11 register steps. Returns 0 when om/boot.om finished (stage in st[12]), negative on a trap. */
+/*
+ * The 11 register steps. Returns 0 when om/boot.om finished (stage in st[12]), negative on a
+ * trap.
+ */
 static int agpu_boot_mmio(struct agpu_dev *d, const u8 *in, struct agpu_boot_out *o)
 {
 	u64 st[32] = { 0 }, act[4], obs = 0, r;
-	u8 *pkt = d->msg_tx;		/* 1024-byte view; the rest of the staging buffer is unused here */
+	/* 1024-byte view; the rest of the staging buffer is unused here */
+	u8 *pkt = d->msg_tx;
 	u32 pause = blk32(in, 64), len = blk32(in, 16);
 	u64 cap;
 	int rc, i;
@@ -43,7 +47,10 @@ static int agpu_boot_mmio(struct agpu_dev *d, const u8 *in, struct agpu_boot_out
 	st[3] = blk32(in, 20);
 	for (i = 0; i < 4; i++)
 		st[4 + i] = blk32(in, 48 + 4 * i);
-	/* om/boot.om bounds every wait by its budget; this cap only guards the glue against a defect */
+	/*
+	 * om/boot.om bounds every wait by its budget; this cap only guards the glue against a
+	 * defect
+	 */
 	cap = 4096 + 4ull * (st[4] + st[5] + st[6] + st[7] + 4);
 	for (;;) {
 		rc = agpu_om("boot", agpu_om_boot, (u64)st, (u64)pkt, obs, (u64)act, 0, 0, &r);

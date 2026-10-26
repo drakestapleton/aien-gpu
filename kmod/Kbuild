@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT OR GPL-2.0-only
 obj-m := aien_gpu.o
-aien_gpu-y := aien_gpu_main.o aien_gpu_boot.o aien_gpu_rpc.o aien_gpu_mem.o agpu_om.o
+aien_gpu-y := aien_gpu_main.o aien_gpu_boot.o aien_gpu_rpc.o aien_gpu_mem.o aien_gpu_rm.o agpu_om.o
 # agpu_om.S .incbin's the Omega units that the top-level `make om` built and kcheck passed.
 asflags-y += -Wa,-I$(OMBUILD)
