@@ -7,7 +7,7 @@
 # OMC must be the seeded Omega compiler with the pinned sha256 below; nothing else is accepted.
 
 OMC ?= $(error set OMC=/path/to/omega-mv/seed/out/omc (sha256 $(OMC_SHA256)))
-OMC_SHA256 := befb8199db8c4bca188a494dfaac2a6f0ee5c36fcea11188c75666c55fce8a1d
+OMC_SHA256 := 189ada82e00bb440cb41351bd252cc68c54a1b1050051cc42a1df700081c3b54
 ORACLE_REPO := https://github.com/aien-dev/aienux.git
 ORACLE_REV := c9678d7b5286b15cfdb92a648264de6d3e9e72ac
 KDIR ?= /lib/modules/$(shell uname -r)/build
