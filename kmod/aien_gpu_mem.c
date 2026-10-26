@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT OR GPL-2.0-only
 /*
- * aien_gpu_mem.c -- GPU memory and page tables, Linux glue only. Entry encodings, index math, the walk
- * plan, argument and overlap checks, mmap placement, slices, kernel-VA placement, the reserved-PDE
- * parameters and the TLB invalidate words are Omega units (om/gmmu.om, om/memchk.om, om/rpdes.om);
- * this file allocates and maps pages, stores what the units return and touches the registers.
+ * aien_gpu_mem.c -- GPU memory and page tables, Linux glue only. Entry encodings, index math,
+ * the walk plan, argument and overlap checks, mmap placement, slices, kernel-VA placement, the
+ * reserved-PDE parameters and the TLB invalidate words are Omega units (om/gmmu.om,
+ * om/memchk.om, om/rpdes.om); this file allocates and maps pages, stores what the units return
+ * and touches the registers.
  *
- * One address space per open file (Route B, docs/STAGE-C.md): an RM-managed FERMI_VASPACE_A whose
- * page tables (ver3, 5 levels, 4 KiB pages) live in dma-coherent system memory written here. User
- * memory is order-0 pages, each dma_map'ed (the IOMMU translates; the GPU sees IOVAs), mapped into the
- * caller at va (normal cacheable memory, as nvidia.ko maps sysmem) and into the GPU at gpu_va == va.
+ * One address space per open file (Route B, docs/STAGE-C.md): an RM-managed FERMI_VASPACE_A
+ * whose page tables (ver3, 5 levels, 4 KiB pages) live in dma-coherent system memory written
+ * here. User memory is order-0 pages, each dma_map'ed (the IOMMU translates; the GPU sees
+ * IOVAs), mapped into the caller at va (normal cacheable memory, as nvidia.ko maps sysmem) and
+ * into the GPU at gpu_va == va.
  * Status: IMPLEMENTED; host tests cover the units; hardware NOT_RUN.
  */
 #include <linux/delay.h>
@@ -22,11 +24,15 @@
 #include "aien_gpu.h"
 #include "aien_gpu_mem.h"
 
-#define AGPU_INVAL_PDB 0x00b830a0u	/* NV_VIRTUAL_FUNCTION_PRIV_MMU_INVALIDATE_PDB, 0xb80000 + 0x30a0 */
-#define AGPU_INVAL_UPPER 0x00b830a4u	/* ..._MMU_INVALIDATE_UPPER_PDB */
-#define AGPU_INVAL 0x00b830b0u		/* ..._MMU_INVALIDATE: gb100/dev_vm.h:327-402 */
-#define AGPU_PT_BYTES 4096u		/* every page-table page; the root uses 16 bytes of its page */
-#define AGPU_LEAF 7u			/* om/gmmu.om op 9: the entry at this level is the leaf */
+/*
+ * NV_VIRTUAL_FUNCTION_PRIV_MMU_INVALIDATE_PDB, _UPPER_PDB, _INVALIDATE: 0xb80000 + 0x30a0/a4/b0,
+ * gb100/dev_vm.h:327-402
+ */
+#define AGPU_INVAL_PDB 0x00b830a0u
+#define AGPU_INVAL_UPPER 0x00b830a4u
+#define AGPU_INVAL 0x00b830b0u
+#define AGPU_PT_BYTES 4096u	/* every page-table page; the root uses 16 bytes of its page */
+#define AGPU_LEAF 7u		/* om/gmmu.om op 9: the entry at this level is the leaf */
 
 /* om/gmmu.om ops */
 enum { G_IDX = 1, G_PDE = 2, G_PTE = 3, G_TLB = 4, G_PENDING = 5, G_COUNT = 7, G_ESIZE = 8,
@@ -151,9 +157,10 @@ static void pt_free(struct agpu_dev *d, struct agpu_pt *t, bool leak)
 }
 
 /*
- * Walk to the table holding va's entry at level `target` (or at the leaf of a 4 KiB mapping, if that
- * comes first), creating missing tables when `create`. Levels strictly increase, so the loop runs at
- * most 7 times. Every new entry is written only after om/gmmu.om op 10 allows the CPU to write it.
+ * Walk to the table holding va's entry at level `target` (or at the leaf of a 4 KiB mapping, if
+ * that comes first), creating missing tables when `create`. Levels strictly increase, so the
+ * loop runs at most 7 times. Every new entry is written only after om/gmmu.om op 10 allows the
+ * CPU to write it.
  */
 static int pt_walk(struct agpu_dev *d, struct agpu_fmem *m, u64 va, u64 target, bool create,
 		   struct agpu_pt **tp, u64 *ip)
@@ -201,7 +208,7 @@ static int pt_walk(struct agpu_dev *d, struct agpu_fmem *m, u64 va, u64 target, 
 	return -EPROTO;
 }
 
-/* Write 4 KiB PTEs for n pages from va: device addresses iova[k], or base + 4096 k when iova is NULL. */
+/* Write 4 KiB PTEs for n pages from va: device addresses iova[k], or base + 4096 k without iova. */
 static int map_pages(struct agpu_dev *d, struct agpu_fmem *m, u64 va, const dma_addr_t *iova,
 		     dma_addr_t base, u64 n, u64 fl, u64 *done)
 {
@@ -285,8 +292,8 @@ int agpu_tlb_invalidate(struct agpu_dev *d, struct agpu_file *f)
 		if (rc)
 			return rc;
 	}
-	dma_wmb();			/* the entries reach memory before the GPU walks again */
-	rc = tlb_wait(d);		/* kgmmuInvalidateTlb_GM107: no invalidate already in flight */
+	dma_wmb();		/* the entries reach memory before the GPU walks again */
+	rc = tlb_wait(d);	/* kgmmuInvalidateTlb_GM107: no invalidate already in flight */
 	if (rc)
 		return rc;
 	iowrite32((u32)w[0], d->bar0 + AGPU_INVAL_PDB);
@@ -369,7 +376,7 @@ int agpu_vas_create(struct agpu_file *f)
 	/* PDEs and the reserved-PDE levels say SYSTEM_COHERENT: true only for a coherent device. */
 	if (!dev_is_dma_coherent(&d->pdev->dev))
 		return -ENODEV;
-	m = kvzalloc(sizeof(*m), GFP_KERNEL);
+	m = kvzalloc_obj(*m, GFP_KERNEL);
 	if (!m)
 		return -ENOMEM;
 	m->root = pt_new(d, 0);
@@ -475,7 +482,8 @@ static int obj_pages(struct agpu_dev *d, struct agpu_mobj *o)
 		o->pages[k] = alloc_page(GFP_KERNEL_ACCOUNT | __GFP_ZERO | __GFP_NOWARN);
 		if (!o->pages[k])
 			return -ENOMEM;
-		o->iova[k] = dma_map_page(&d->pdev->dev, o->pages[k], 0, PAGE_SIZE, DMA_BIDIRECTIONAL);
+		o->iova[k] = dma_map_page(&d->pdev->dev, o->pages[k], 0, PAGE_SIZE,
+					  DMA_BIDIRECTIONAL);
 		if (dma_mapping_error(&d->pdev->dev, o->iova[k])) {
 			o->iova[k] = 0;
 			return -ENOMEM;
@@ -651,8 +659,10 @@ int agpu_mem_mmap(struct agpu_file *f, struct vm_area_struct *vma)
 	return vm_insert_pages(vma, vma->vm_start, o->pages, &n);
 }
 
-/* Tear the address space down. The GPU must no longer use it (GSP-RM freed the vaspace); stale TLB
- * entries tagged with this root are invalidated before its pages can be reused. */
+/*
+ * Tear the address space down. The GPU must no longer use it (GSP-RM freed the vaspace); stale
+ * TLB entries tagged with this root are invalidated before its pages can be reused.
+ */
 void agpu_vas_destroy(struct agpu_file *f)
 {
 	struct agpu_dev *d = f->d;
@@ -664,7 +674,8 @@ void agpu_vas_destroy(struct agpu_file *f)
 		return;
 	leak = m->abandoned || d->info.state != AGPU_STATE_RM_READY || agpu_tlb_invalidate(d, f);
 	if (leak)
-		dev_warn(&d->pdev->dev, "GPU address space kept until reboot (%u objects)\n", m->nobj);
+		dev_warn(&d->pdev->dev, "GPU address space kept until reboot (%u objects)\n",
+			 m->nobj);
 	for (i = 0; i < m->nobj; i++)
 		obj_free(d, m->obj[i], leak);
 	pt_free(d, m->root, leak);

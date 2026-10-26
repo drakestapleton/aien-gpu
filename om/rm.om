@@ -11,13 +11,9 @@ note aligned, 5 GPFIFO entries not a power of two in 8..65536, 6 ChID above 4095
 note other than 0 (cached) or 1 (uncached), 8 promote entry count or buffer id out of range,
 note 9 reserved-PDE params not the [4 GiB, 4.5 GiB) 2 MiB shape, 10 control params too large.
 note Hex constants written in decimal (each converted with Wolfram, docs/STAGE-C.md section 6):
-note 0x03000000 is not used here (seal), 4294967295 = 0xffffffff, 2097152 = 0x200000,
-note 4294967296 = 0x100000000, 4831838207 = 0x11fffffff, 2097152 = 1 << 21 (USERD_INDEX_PAGE_FIXED),
-note 2147749919 = 0x80020001 is not used; class ids: 128 = 0x80 NV01_DEVICE_0, 8320 = 0x2080
+note 4294967295 = 0xffffffff, 2097152 = 0x200000; class ids: 128 = 0x80 NV01_DEVICE_0, 8320 = 0x2080
 note NV20_SUBDEVICE_0, 37105 = 0x90f1 FERMI_VASPACE_A, 41068 = 0xa06c KEPLER_CHANNEL_GROUP_A,
-note 36967 = 0x9067 FERMI_CONTEXT_SHARE_A; controls: 2416967942 = 0x90f10106 COPY_SERVER_RESERVED_PDES,
-note 2691432714 = 0xa06c010a PROMOTE_FAULT_METHOD_BUFFERS, 2691432705 = 0xa06c0101 GPFIFO_SCHEDULE,
-note 545259819 = 0x2080012b GPU_PROMOTE_CTX.
+note 36967 = 0x9067 FERMI_CONTEXT_SHARE_A. The controls are om/rmctl.om, the channel om/rmchan.om.
 fn p32 m edit uchar 65536 o ulong v ulong to void
 put m o uchar and v 255
 put m add o 1 uchar and shr v 8 255

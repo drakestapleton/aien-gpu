@@ -59,6 +59,21 @@ mqget|parity_mq|if lt rd32 s 24 32|if lt rd32 s 24 0
 ident|unit_test|if ne and shr boot42 20 15 11|if ne and shr boot42 20 15 12
 abi|unit_test|for k ulong 52|for k ulong 51
 abi|unit_test|if or eq p 0 gt p 1000|if or eq p 0 gt p 1001
+gmmu|parity_gmmu|ret or or pa 16 shl ap 1|ret or or pa 8 shl ap 1
+gmmu|parity_gmmu|pcf = add 16 and fl 1|pcf = add 0 and fl 1
+gmmu|parity_gmmu|ap = add 2 shr fl 1|ap = add 3 shr fl 1
+gmmu|parity_gmmu|ret 2147483649|ret 2147483648
+gmmu|parity_gmmu|ret or shl and fr 268435455 4 2|ret or shl and fr 268435455 4 0
+gmmu|parity_gmmu|ret and shr fr 28 1048575|ret and shr fr 27 1048575
+gmmu|parity_gmmu|ret 47|ret 48
+gmmu|parity_gmmu|if and ge lv 4 and ge va 4294967296 lt va 4831838208|if and ge lv 5 and ge va 4294967296 lt va 4831838208
+memchk|parity_gmmu|if and lt va 4831838208 gt add va sz 4294967296|if and lt va 4831834112 gt add va sz 4294967296
+memchk|parity_gmmu|if and lt va add ov os lt ov add va sz|if and le va add ov os lt ov add va sz
+memchk|parity_gmmu|gt sz 68719476736|ge sz 68719476736
+memchk|parity_gmmu|if eq n 256|if eq n 255
+rpdes|parity_gmmu|sz = 16|sz = 4096
+rpdes|parity_gmmu|ap = add 3 get lv 5|ap = add 2 get lv 5
+rpdes|parity_gmmu|put p 32 uchar 5|put p 32 uchar 6
 EOF
 if [ "$killed" -ne "$total" ]; then echo "MUTANTS FAIL killed=$killed/$total"; exit 1; fi
 echo "MUTANTS PASS killed=$killed/$total"

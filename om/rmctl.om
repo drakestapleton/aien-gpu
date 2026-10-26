@@ -4,7 +4,8 @@ note buffer at byte 80 (split from om/rm.om, which builds the allocations: one k
 note Call: agpu_rm_ctl op m a, same contract and refusal codes as om/rm.om (a[48] function, a[49] rpclen,
 note a[50] placed; 1000000 + code). Ops 11..17 below. Hex constants written in decimal (Wolfram):
 note 4294967295 = 0xffffffff, 2097152 = 0x200000, 4294967296 = 0x100000000, 4831838207 = 0x11fffffff,
-note 2416967942 = 0x90f10106, 2691432714 = 0xa06c010a, 2691432705 = 0xa06c0101, 545259819 = 0x2080012b.
+note 2431713542 = 0x90f10106, 2691432714 = 0xa06c010a, 2691432705 = 0xa06c0101, 545259819 = 0x2080012b.
+note (A first draft had 2416967942 for 0x90f10106; the Wolfram conversion caught it.)
 fn p32 m edit uchar 65536 o ulong v ulong to void
 put m o uchar and v 255
 put m add o 1 uchar and shr v 8 255
@@ -173,7 +174,7 @@ k = add k 1
 end
 p32 m 80 get a 0
 p32 m 84 get a 1
-p32 m 88 2416967942
+p32 m 88 2431713542
 p32 m 92 0
 p32 m 96 184
 p32 m 100 0
