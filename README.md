@@ -7,6 +7,19 @@ built on AienOS (ledger L332).
 **Status: IMPLEMENTED. Host and QEMU tests pass. Hardware NOT_RUN.** Nothing here has run on the
 GB10 yet. The window that will run it is in `window/`. Per-part evidence is in `docs/STATUS.md`.
 
+## Human-Directed Agentic Engineering
+
+Development follows Human-Directed Agentic Engineering (HDAE): humans define goals,
+architecture, constraints, acceptance criteria, and stopping points; agents implement,
+execute checks, diagnose failures, and revise within those boundaries. Human review
+retains responsibility for claims, acceptance, and release decisions. This describes
+development, not hardware qualification or the driver's runtime decision logic.
+
+For the documented method and a systems-software case study, see Gregory M. Kurtzer,
+[*Ginux: Building an Independent Kernel That Runs Linux Userspace through
+Human-Directed Agentic Engineering* (2026)](https://doi.org/10.5281/zenodo.23682548).
+
+
 ## What it is
 
 - A Linux kernel module, `kmod/aien_gpu.ko`. The C in it is Linux glue: PCI, DMA, mmap, locks,
