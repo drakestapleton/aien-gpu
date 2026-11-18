@@ -60,6 +60,9 @@ seal|parity_mq|put32 m 68 4294967295|put32 m 68 0
 mqput|parity_mq|room = rem sub add gsprd 63 add wr 1 63|room = rem sub add gsprd 63 wr 63
 mqget|parity_mq|if ne ro32 out 36 rxseq|if ne ro32 out 36 ro32 out 36
 mqget|parity_mq|if lt rd32 s 24 32|if lt rd32 s 24 0
+ident|unit_test|if and ne arch 26 ne arch 27|if ne arch 26
+ident|unit_test|if and ne arch 26 ne arch 27|if ne arch 27
+ident|unit_test|if and ne arch 26 ne arch 27|if and ne arch 26 ne arch 28
 ident|unit_test|if ne and shr boot42 20 15 11|if ne and shr boot42 20 15 12
 abi|unit_test|for k ulong 52|for k ulong 51
 abi|unit_test|if or eq p 0 gt p 1000|if or eq p 0 gt p 1001

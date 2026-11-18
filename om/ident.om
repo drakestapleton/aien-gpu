@@ -4,12 +4,14 @@ note stage 0 uses PCI facts only (no MMIO). stage 1 adds the two identity regist
 note Result 0 = accept. Otherwise the first failed check:
 note 1 vendor is not NVIDIA 0x10de. 2 device is not GB10 0x2e12 (lspci -nn on the Spark 2026-10-21).
 note 3 BAR0 is not 64 MiB (the GB10 has only BAR0, 0x24000000-0x27ffffff). 4 stage is not 0 or 1.
-note 5 PMC_BOOT_0 reads 0 or all ones (no answer). 6 PMC_BOOT_42 ARCHITECTURE 29:24 is not GB100 0x1a.
-note 7 PMC_BOOT_42 IMPLEMENTATION 23:20 is not GB10B 0xb.
+note 5 PMC_BOOT_0 reads 0 or all ones (no answer).
+note 6 PMC_BOOT_42 ARCHITECTURE 29:24 is neither GB100 0x1a nor GB200 0x1b (Spark GPUID.TXT: BOOT_0=0x1bb000a1, BOOT_42=0x1bba1000).
+note 7 PMC_BOOT_42 IMPLEMENTATION 23:20 is not 0xb (GB10B/GB20B).
 note Sources (open-gpu-kernel-modules 580.173.02, MIT): src/common/inc/swref/published/nv_ref.h:153,170,182;
-note src/nvidia/generated/g_hal_archimpl.h:88 (GB10B = ARCHITECTURE_GB100 with IMPLEMENTATION_B).
-note Decimal values: 0x10de 4318, 0x2e12 11794, 64 MiB 67108864, 0xffffffff 4294967295, 0x1a 26, 0xb 11,
-note 0x3f 63 (Wolfram FromDigits, 2026-10-26).
+note src/nvidia/generated/g_hal_archimpl.h:88 (GB10B = ARCHITECTURE_GB100 with IMPLEMENTATION_B);
+note Spark bare-metal GPUID.TXT (2026-11-12T05:45Z): GB20B = ARCHITECTURE_GB200 (0x1b) with IMPLEMENTATION_B (0xb).
+note Decimal values: 0x10de 4318, 0x2e12 11794, 64 MiB 67108864, 0xffffffff 4294967295, 0x1a 26, 0x1b 27, 0xb 11,
+note 0x3f 63 (Wolfram FromDigits, 2026-10-26; 0x1b = 27 = 26 + 1).
 fn agpu_ident vendor ulong device ulong barlen ulong boot0 ulong boot42 ulong stage ulong to ulong
 if ne vendor 4318
 ret 1
@@ -29,7 +31,8 @@ end
 if or eq boot0 0 eq boot0 4294967295
 ret 5
 end
-if ne and shr boot42 24 63 26
+arch = and shr boot42 24 63
+if and ne arch 26 ne arch 27
 ret 6
 end
 if ne and shr boot42 20 15 11

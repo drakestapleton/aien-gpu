@@ -31,8 +31,12 @@ static void test_ident(void)
 	CHECK(ident(V, D, BAR, 0x1b0000a1, boot42(0x1a, 0xb, 0xa1), 1) == 0);	/* GB10B */
 	CHECK(ident(V, D, BAR, 0, boot42(0x1a, 0xb, 0), 1) == 5);
 	CHECK(ident(V, D, BAR, 0xffffffffu, boot42(0x1a, 0xb, 0), 1) == 5);
-	CHECK(ident(V, D, BAR, 1, boot42(0x1b, 0xb, 0), 1) == 6);		/* GB20B, not ours */
+	CHECK(ident(V, D, BAR, 1, boot42(0x1b, 0xb, 0), 1) == 0);		/* GB20B */
+	CHECK(ident(V, D, BAR, 0x1bb000a1u, 0x1bba1000u, 1) == 0);		/* Spark bare-metal GPUID.TXT */
+	CHECK(ident(V, D, BAR, 1, boot42(0x1c, 0xb, 0), 1) == 6);		/* unknown arch > 0x1b */
+	CHECK(ident(V, D, BAR, 1, boot42(0x19, 0xb, 0), 1) == 6);		/* unknown arch < 0x1a */
 	CHECK(ident(V, D, BAR, 1, boot42(0x1a, 0x0, 0), 1) == 7);		/* GB100 */
+	CHECK(ident(V, D, BAR, 1, boot42(0x1b, 0x0, 0), 1) == 7);		/* GB200 */
 	CHECK(ident(V, D, BAR, 1, 0xffffffffu, 1) == 6);
 }
 
