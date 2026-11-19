@@ -1,30 +1,36 @@
 note SPDX-License-Identifier: MIT OR GPL-2.0-only
-note boot: the GB10B GSP start-up (11 register steps) as a step machine. Omega decides every register
-note access; the kernel glue only performs the one action it is handed and calls again.
-note Port of aien-dev/aienux feat/own-gpu-driver c9678d7b native/kernel/gpu/gsp_mmio.c (the oracle,
-note same register order, checked on its simulator by tests/host/parity_boot.c). NVIDIA sources for
-note every step are cited in that file's header (open-gpu-kernel-modules 580.173.02, MIT):
-note 1 wait SEC2 EMEM channel 0 empty (QUEUE_HEAD == QUEUE_TAIL), 2-4 write the packet through EMEMC/EMEMD
-note with auto-increment and check the write pointer, 5 QUEUE_TAIL then QUEUE_HEAD (doorbell),
-note 6 wait SEC2 MAILBOX0 != 0xc001cafe, 7 wait GSP HWCFG2 mask released, 8 wait lockdown released or an
-note FMC code, 9 GSP MAILBOX0 must be 0, 10 FALCON_OS = appVersion, 11 RISC-V CPUCTL ACTIVE (bit 7).
+note boot: the GB10B and GB20B GSP start-up as a pure-Omega step machine. Omega decides every
+note register access; the kernel glue only performs the one action it is handed and calls again.
+note GB10B path (st 25 = 0): port of aien-dev/aienux c9678d7b native/kernel/gpu/gsp_mmio.c.
+note GB20B path (st 25 = 1): port of NVIDIA open-gpu-kernel-modules 580.173.02
+note kernel_sec2_gb20b.c (FWSEC scratch 0x5e0 == 0xff, COTv2/no-FRTS header check, SEC2 MSGQ
+note 0x840c80/0x840c84 reply over EMEM AINCR, TAIL-before-HEAD ack, SEC2_RESPONSE 0x1510de7e,
+note COT cmd 0x14, FSP_OK 0) and ogd-qual-gsp/gsp/sec2.om, plus shared GSP mask/lockdown/FMC/
+note FALCON_OS/RISC-V active steps with 0xbadf41xx target-mask guard in step 8.
 note
 note st (32 ulong, caller zeroes it and sets the inputs):
 note   0 pc (0 = start)  1 packet bytes 1..1024  2 FMC boot-argument address  3 appVersion
-note   4..7 poll budgets for steps 1, 6, 7, 8   8 poll counter   9 packet byte index   10 EMEM start
-note   11 SEC2 QUEUE_HEAD read in step 1
-note   12 stage: 0 ok, 1 arg, 2 busy, 3 emem, 4 sec2, 5 mask, 6 lockdown, 7 fmc, 8 riscv (C enum, sign dropped)
-note   13..16 polls used by steps 1, 6, 7, 8   17 dwords   18 EMEMC after   19 SEC2 MAILBOX0   20 SEC2 MAILBOX1
-note   21 HWCFG2   22 GSP MAILBOX0   23 GSP MAILBOX1   24 CPUCTL
-note act (4 ulong) written on result 0: 0 kind (1 read, 2 write, 3 pause between polls), 1 BAR0 offset,
-note   2 value to write. obs = the value the previous read returned (0 after a write or a pause).
-note Result: 0 = do act and call again, 1 = finished (st 12 holds the stage).
-note Register offsets (decimal of the hex in gsp_mmio.h, Wolfram FromDigits 2026-10-26):
-note SEC2 MAILBOX0 0x840040, MAILBOX1 0x840044, EMEMC0 0x840ac0, EMEMD0 0x840ac4, QHEAD0 0x840c00,
-note QTAIL0 0x840c04; GSP MAILBOX0 0x110040, MAILBOX1 0x110044, FALCON_OS 0x110080, HWCFG2 0x1100f4,
-note RISC-V CPUCTL 0x111388. EMEMC 16777216 bit 24 0x1000000, busy 0xc001cafe, locked 0xbadf4100 under
-note mask 0xffffff00, lockdown bit 13, active bit 7. omc befb8199 refuses `const` in function mode
-note (error 9 at end of input), so these appear below as decimal literals.
+note   4..7 poll budgets for steps 1, 6 (and GB20B step 0), 7, 8   8 poll counter
+note   9 packet byte index  10 EMEM start  11 SEC2 QUEUE_HEAD or MSGQ_HEAD
+note   12 stage: 0 ok, 1 arg, 2 busy, 3 emem, 4 sec2, 5 mask, 6 lockdown, 7 fmc, 8 riscv
+note   13..16 polls used by steps 1, 6, 7, 8  17 dwords  18 EMEMC after
+note   19 SEC2 MAILBOX0 (GB10B) or SEC2 reply error / scratch (GB20B)
+note   20 SEC2 MAILBOX1 (GB10B) or SEC2 reply task ID (GB20B)
+note   21 HWCFG2  22 GSP MAILBOX0  23 GSP MAILBOX1  24 CPUCTL
+note   25 profile (0 = GB10B, 1 = GB20B)  26 reply dwords  27 reply idx / ememc_end
+note   28 reply w0  29 reply w1  30 reply w3  31 reply w4
+note act (4 ulong) written on result 0: 0 kind (1 read, 2 write, 3 pause), 1 BAR0 offset, 2 value.
+note obs = previous read value (0 after write or pause). Result: 0 = act, 1 = finished (st 12).
+note Register/constant decimals (aien-calc eval, 2026-11-18):
+note   NV_PMC_SCRATCH_RESET_PLUS_2 0x5e0 = 1504; SEC2 MAILBOX0 0x840040 = 8650816,
+note   MAILBOX1 0x840044 = 8650820, EMEMC0 0x840ac0 = 8653504, EMEMD0 0x840ac4 = 8653508,
+note   QHEAD0 0x840c00 = 8653824, QTAIL0 0x840c04 = 8653828, MSGQ_HEAD0 0x840c80 = 8653952,
+note   MSGQ_TAIL0 0x840c84 = 8653956; GSP MAILBOX0 0x110040 = 1114176, MAILBOX1 0x110044 = 1114180,
+note   FALCON_OS 0x110080 = 1114240, HWCFG2 0x1100f4 = 1114356, CPUCTL 0x111388 = 1119112;
+note   AINCW 0x1000000 = 16777216, AINCR 0x2000000 = 33554432, MCTP SOM|EOM 0xc0000000 = 3221225472,
+note   NVDM COT 0x1410de7e = 336649854, NVDM SEC2_RESPONSE 0x1510de7e = 353427070 (IC mask 0xffffff7f = 4294967167),
+note   COTv2 hdr (860<<16)|2 = 56360962, busy 0xc001cafe = 3221342974,
+note   locked 0xbadf4100 = 3135193344 under mask 0xffffff00 = 4294967040, lockdown 0x2000 = 8192.
 fn bact act edit ulong 4 kind ulong off ulong val ulong to ulong
 put act 0 kind
 put act 1 off
@@ -36,11 +42,9 @@ put st 12 stage
 put st 0 99
 ret 1
 end
-note EMEMC: block 15:8 times 64 dwords plus offset 7:2 (gsp_mmio.c emem_dwords).
 fn ememdw v ulong to ulong
 ret add mul and shr v 8 255 64 and shr v 2 63
 end
-note Little-endian dword of packet bytes i..i+3, zero beyond the packet length n.
 fn pword pkt view uchar 1024 i ulong n ulong to ulong
 w = ulong 0
 for k ulong 4
@@ -49,6 +53,48 @@ w = or w shl ulong get pkt add i k mul k 8
 end
 end
 ret w
+end
+note GB20B COTv2 packet header check before any MMIO access.
+fn bcot2 pkt view uchar 1024 n ulong to bool
+if ne n 868
+ret false
+end
+if ne pword pkt 0 n 3221225472
+ret false
+end
+if ne pword pkt 4 n 336649854
+ret false
+end
+if ne pword pkt 8 n 56360962
+ret false
+end
+for k ulong 6
+if ne pword pkt add 20 mul k 4 n 0
+ret false
+end
+end
+ret true
+end
+note GB20B Step 0: wait FWSEC secure boot NV_PMC_SCRATCH_RESET_PLUS_2 (0x5e0) == 0xFF.
+fn bstep0 st edit ulong 32 obs ulong act edit ulong 4 to ulong
+pc = get st 0
+if eq pc 1
+put st 0 2
+ret bact act 1 1504 0
+end
+if eq obs 255
+put st 8 0
+put st 0 10
+ret 2
+end
+n = get st 8
+if ge n get st 5
+put st 19 obs
+ret bfin st 4
+end
+put st 8 add n 1
+put st 0 1
+ret bact act 3 0 0
 end
 note Step 1: SEC2 channel empty. pc 10 read HEAD, 11 read TAIL, 12 compare.
 fn bstep1 st edit ulong 32 obs ulong act edit ulong 4 to ulong
@@ -115,10 +161,14 @@ put st 0 26
 ret bact act 2 8653828 sub mul dw 4 4
 end
 put st 8 0
+if eq get st 25 1
+put st 0 35
+else
 put st 0 30
+end
 ret bact act 2 8653824 0
 end
-note Step 6: SEC2 handled the command (MAILBOX0 no longer the busy pattern).
+note GB10B Step 6: SEC2 handled the command (MAILBOX0 no longer 0xc001cafe).
 fn bstep6 st edit ulong 32 obs ulong act edit ulong 4 to ulong
 pc = get st 0
 if eq pc 30
@@ -145,6 +195,110 @@ end
 put st 8 add n 1
 put st 0 30
 ret bact act 3 0 0
+end
+note GB20B Step 6a: poll SEC2 MSGQ HEAD != TAIL, validate packet size, arm EMEMC AINCR.
+fn bgb20 st edit ulong 32 obs ulong act edit ulong 4 to ulong
+pc = get st 0
+if eq pc 35
+put st 0 36
+ret bact act 1 8653952 0
+end
+if eq pc 36
+put st 11 obs
+put st 0 37
+ret bact act 1 8653956 0
+end
+h = get st 11
+n = get st 8
+if ne h obs
+put st 14 n
+if or lt obs h gt obs 1020
+put st 19 1001
+ret bfin st 4
+end
+sz = add sub obs h 4
+if or lt sz 20 ne rem sz 4 0
+put st 19 1001
+ret bfin st 4
+end
+put st 26 div sz 4
+put st 27 0
+put st 0 70
+ret bact act 2 8653504 33554432
+end
+if ge n get st 5
+put st 14 n
+put st 19 1000
+ret bfin st 4
+end
+put st 8 add n 1
+put st 0 35
+ret bact act 3 0 0
+end
+note GB20B Step 6b: read reply words via EMEMD, read EMEMC, ack TAIL then HEAD, check reply.
+fn bgb20r st edit ulong 32 obs ulong act edit ulong 4 to ulong
+pc = get st 0
+if eq pc 70
+if lt get st 27 get st 26
+put st 0 71
+ret bact act 1 8653508 0
+end
+put st 0 72
+ret bact act 1 8653504 0
+end
+if eq pc 71
+i = get st 27
+if eq i 0
+put st 28 obs
+end
+if eq i 1
+put st 29 obs
+end
+if eq i 2
+put st 20 obs
+end
+if eq i 3
+put st 30 obs
+end
+if eq i 4
+put st 31 obs
+put st 19 obs
+end
+put st 27 add i 1
+put st 0 70
+ret 2
+end
+if eq pc 72
+put st 27 ememdw obs
+put st 0 73
+ret bact act 2 8653956 get st 11
+end
+if eq pc 73
+put st 0 74
+ret bact act 2 8653952 get st 11
+end
+if ne get st 27 get st 26
+put st 19 1002
+ret bfin st 4
+end
+if ne and get st 28 3221225472 3221225472
+put st 19 1003
+ret bfin st 4
+end
+if ne and get st 29 4294967167 353427070
+put st 19 1004
+ret bfin st 4
+end
+if ne get st 30 20
+put st 19 1005
+ret bfin st 4
+end
+if ne get st 31 0
+ret bfin st 4
+end
+put st 8 0
+put st 0 40
+ret 2
 end
 note Step 7: GSP target mask released: HWCFG2 non-zero and not 0xbadf41xx.
 fn bstep7 st edit ulong 32 obs ulong act edit ulong 4 to ulong
@@ -181,8 +335,7 @@ put st 8 add n 1
 put st 0 50
 ret bact act 3 0 0
 end
-note Step 8: lockdown released or an FMC code. MAILBOX0:MAILBOX1 equal to the FMC argument address
-note means not read yet (keep waiting, HWCFG2 not read on that pass, as the driver).
+note Step 8: lockdown released or an FMC code. Ignore 0xbadf41xx PRI target-locked reads.
 fn bstep8 st edit ulong 32 obs ulong act edit ulong 4 to ulong
 pc = get st 0
 pa = get st 2
@@ -196,6 +349,9 @@ ret bfin st 6
 end
 if eq pc 51
 put st 22 obs
+if eq and obs 4294967040 3135193344
+ret bwait8 st act
+end
 if and ne obs 0 eq obs and pa 4294967295
 put st 0 52
 ret bact act 1 1114180 0
@@ -212,6 +368,9 @@ put st 0 53
 ret bact act 1 1114356 0
 end
 put st 21 obs
+if or eq obs 0 eq and obs 4294967040 3135193344
+ret bwait8 st act
+end
 if or eq and obs 8192 0 ne get st 22 0
 put st 16 get st 8
 put st 0 60
@@ -243,14 +402,28 @@ end
 note Entry. Each call runs at most a few internal transitions (helpers return 2) before an action.
 fn agpu_boot_next st edit ulong 32 pkt view uchar 1024 obs ulong act edit ulong 4 to ulong
 if eq get st 0 0
-for k ulong 20
+for k ulong 17
 put st add k 8 0
 end
+for k ulong 6
+put st add k 26 0
+end
+prof = get st 25
+if gt prof 1
+ret bfin st 1
+end
 n = get st 1
+if eq prof 1
+if not bcot2 pkt n
+ret bfin st 1
+end
+put st 0 1
+else
 if or eq n 0 gt n 1024
 ret bfin st 1
 end
 put st 0 10
+end
 end
 r = ulong 2
 while eq r 2 bound 8
@@ -258,14 +431,20 @@ pc = get st 0
 if eq pc 99
 ret 1
 end
+if lt pc 10
+r = bstep0 st obs act
+else
 if lt pc 20
 r = bstep1 st obs act
 else
 if lt pc 30
 r = bstep2 st pkt obs act
 else
-if lt pc 40
+if lt pc 35
 r = bstep6 st obs act
+else
+if lt pc 40
+r = bgb20 st obs act
 else
 if lt pc 50
 r = bstep7 st obs act
@@ -273,7 +452,13 @@ else
 if lt pc 60
 r = bstep8 st obs act
 else
+if lt pc 70
 r = bstep9 st obs act
+else
+r = bgb20r st obs act
+end
+end
+end
 end
 end
 end

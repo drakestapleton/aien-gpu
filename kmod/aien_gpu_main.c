@@ -81,6 +81,8 @@ static int agpu_selftest(void)
 
 	rc |= agpu_om("ident", agpu_om_ident, 0x10de, 0x2e12, 64ull << 20, 0x1b0000a1,
 		      (0x1aull << 24) | (0xbull << 20), 1, &r) ?: st_check("ident GB10B", r == 0);
+	rc |= agpu_om("ident", agpu_om_ident, 0x10de, 0x2e12, 64ull << 20, 0x1bb000a1,
+		      0x1bba1000u, 1, &r) ?: st_check("ident GB20B", r == 0);
 	rc |= agpu_om("ident", agpu_om_ident, 0x1b36, 0x0005, 4096, 0, 0, 0, &r) ?:
 	      st_check("ident other vendor", r == 1);
 	/* a valid AGPU_BOOT block (tests/host/unit_test.c good_boot) */

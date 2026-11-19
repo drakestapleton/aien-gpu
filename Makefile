@@ -56,6 +56,9 @@ OCFLAGS := -I $(OGPU) -I $(ODEV) -Wno-unused-parameter -Wno-sign-compare
 $(B)/parity_boot: tests/host/parity_boot.c $(B)/agpu_om.o $(ORACLE)/.rev
 	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(OGPU)/gsp_mmio.c $(OGPU)/gsp_sim.c $(B)/agpu_om.o
 
+$(B)/parity_boot_gb20b: tests/host/parity_boot_gb20b.c tools/gb20b_boot.c $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< tools/gb20b_boot.c $(ODEV)/gb10_gsp_boot.c $(B)/agpu_om.o
+
 $(B)/parity_seq: tests/host/parity_seq.c $(B)/agpu_om.o $(ORACLE)/.rev
 	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(OGPU)/gsp_seq.c $(B)/agpu_om.o
 
@@ -79,8 +82,8 @@ $(B)/unit_test: tests/host/unit_test.c $(B)/agpu_om.o
 	$(CC) $(HOSTCFLAGS) -o $@ $< $(B)/agpu_om.o
 
 # stage B user-space tool: the aienux L192 package builder (recorded host dependency) + om/abi.om
-$(B)/aien-gpu-boot: tools/aien-gpu-boot.c kmod/aien_gpu_uapi.h $(B)/agpu_om.o $(ORACLE)/.rev
-	$(CC) $(HOSTCFLAGS) -I kmod -I $(ODEV) -Wno-unused-parameter -o $@ $< $(ODEV)/gb10_gsp_boot.c $(B)/agpu_om.o
+$(B)/aien-gpu-boot: tools/aien-gpu-boot.c tools/gb20b_boot.c kmod/aien_gpu_uapi.h $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) -I kmod -I $(ODEV) -Wno-unused-parameter -o $@ $< tools/gb20b_boot.c $(ODEV)/gb10_gsp_boot.c $(B)/agpu_om.o
 
 # CUDA++ m16 gate over /dev/aien-gpu (stage C); --dry-run needs no device
 $(B)/aien-gpu-m16: tools/aien-gpu-m16.c kmod/aien_gpu_uapi.h | $(B)
@@ -89,7 +92,7 @@ $(B)/aien-gpu-m16: tools/aien-gpu-m16.c kmod/aien_gpu_uapi.h | $(B)
 TOOLS := aien-gpu-boot aien-gpu-m16
 tools: $(TOOLS:%=$(B)/%)
 
-HOST_TESTS := unit_test parity_boot parity_seq parity_mq parity_gmmu parity_rm
+HOST_TESTS := unit_test parity_boot parity_boot_gb20b parity_seq parity_mq parity_gmmu parity_rm
 host-test: $(HOST_TESTS:%=$(B)/%) tools
 	@set -e; for t in $(HOST_TESTS); do ./$(B)/$$t; done
 	sh tests/host/kcheck_controls.sh $(B)/kcheck

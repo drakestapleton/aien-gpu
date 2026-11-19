@@ -1,6 +1,6 @@
 note SPDX-License-Identifier: MIT OR GPL-2.0-only
 note rmarg: the stage-C decisions that are not RPC payloads: ChID allocation, AGPU_CHAN_CREATE argument
-note checks and the work-submit token.
+note checks and the work-submit token (GB10B and GB20B).
 note Call: agpu_rm_arg op bm a. bm = 64 u64 words, the ChID bitmap of GR0's runlist (bit c of word c/64
 note set = ChID c in use; 4096 ChIDs, the doorbell VECTOR field 11:0). a = 64 u64 words.
 note op 1 allocate: a0 = numChannels as GSP-RM reported it (INTERNAL_FIFO_GET_NUM_CHANNELS, read at
@@ -13,16 +13,18 @@ note op 3 AGPU_CHAN_CREATE arguments: a0 entries, a1 ring_off, a2 userd_off, a3 
 note   a4 userd_handle, a5 err_handle. Result 0 or refusal 4 entries not a power of two in 8..65536,
 note   5 ring_off not 8-aligned or not below 2^48, 6 userd_off not 512-aligned (USERD is 512 bytes,
 note   kernel_fifo_gm107.c:1545-1555) or not below 2^48, 7 a handle 0 or above 32 bits.
-note op 4 work-submit token: a0 runlist, a1 ChID. Result (runlist << 16) | ChID
-note   (kfifoGenerateWorkSubmitTokenHal_GB100, arch/blackwell/kernel_fifo_gb100.c:89-123; DOORBELL
-note   RUNLIST_ID 22:16, VECTOR 11:0, gb100/dev_vm.h:620-625), or refusal 8 runlist above 63 (bit 22 would
-note   disable the doorbell) or ChID above 4095.
+note op 4 work-submit token: a0 runlist, a1 ChID, a2 profile (0 = GB10B, 1 = GB20B).
+note   GB10B: (runlist << 16) | ChID (kfifoGenerateWorkSubmitTokenHal_GB100, gb100/dev_vm.h:620-628;
+note   bit 22 RUNLIST_DOORBELL active-low ENABLE=0).
+note   GB20B: 0x40000000 | (runlist << 16) | ChID (kfifoGenerateWorkSubmitTokenHal_GB202,
+note   kernel_fifo_gb202.c:73-76, gb202/dev_vm.h:27-32; bit 30 RUNLIST_DOORBELL active-high ENABLE=1).
+note   Refusal 8 when runlist > 63, ChID > 4095, or profile > 1.
 note op 5 unload: a0 = GSP falcon MAILBOX0 (BAR0 0x110040). Result 1 when it is 0x80000000
 note   (LIBOS_INTERRUPT_PROCESSOR_SUSPENDED, _kgspIsProcessorSuspended, kernel_gsp_tu102.c:1226-1240), else 0.
 note op 6 halt: a0 = RISC-V CPUCTL (BAR0 0x111388). Result 1 when HALTED (4:4, gh100/dev_riscv_pri.h:62)
 note   is set, else 0 (kgspTeardown_GH100, kernel_gsp_gh100.c:995-1004).
-note Decimal constants (Wolfram): 281474976710656 = 2^48, 4294967295 = 0xffffffff,
-note 2147483648 = 0x80000000.
+note Decimal constants (Wolfram / aien-calc): 281474976710656 = 2^48, 4294967295 = 0xffffffff,
+note 2147483648 = 0x80000000, 1073741824 = 0x40000000.
 fn bit bm edit ulong 64 c ulong to bool
 ret ne and get bm div c 64 shl ulong 1 rem c 64 0
 end
@@ -82,10 +84,14 @@ if eq op 3
 ret chanarg a
 end
 if eq op 4
-if or gt get a 0 63 gt get a 1 4095
+if or or gt get a 0 63 gt get a 1 4095 gt get a 2 1
 ret 1000008
 end
-ret or shl get a 0 16 get a 1
+tok = or shl get a 0 16 get a 1
+if eq get a 2 1
+ret or tok 1073741824
+end
+ret tok
 end
 if eq op 5
 if eq get a 0 2147483648

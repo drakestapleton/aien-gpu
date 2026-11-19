@@ -19,6 +19,7 @@ CF="$CF -I $NVSRC/common/sdk/nvidia/inc -I $NVSRC/common/sdk/nvidia/inc/ctrl -I 
 srcs() { # test -> extra C sources
 	case $1 in
 	parity_boot) echo "$ORACLE/gpu/gsp_mmio.c $ORACLE/gpu/gsp_sim.c" ;;
+	parity_boot_gb20b) echo "$ROOT/tools/gb20b_boot.c $ORACLE/dev/gb10_gsp_boot.c" ;;
 	parity_seq) echo "$ORACLE/gpu/gsp_seq.c" ;;
 	parity_mq) echo "$ORACLE/dev/gb10_gsp_boot.c" ;;
 	parity_rm) echo "$ORACLE/dev/gb10_gsp_boot.c" ;;
@@ -102,10 +103,24 @@ rmchk|parity_rm|mul 4096 ms|mul 2048 ms
 rmchk|parity_rm|if or eq c 52928 and eq c 52672 eq get a 0 0|if eq c 52928
 rmchk|parity_rm|s = r32 m 96|s = r32 m 92
 rmchk|parity_rm|if gt get a 1 63|if gt get a 1 64
-rmarg|parity_rm|ret or shl get a 0 16 get a 1|ret or shl get a 0 15 get a 1
+rmarg|parity_rm|tok = or shl get a 0 16 get a 1|tok = or shl get a 0 15 get a 1
+rmarg|parity_rm|ret or tok 1073741824|ret tok
+rmarg|parity_rm|if or or gt get a 0 63 gt get a 1 4095 gt get a 2 1|if or or gt get a 0 63 gt get a 1 4095 gt get a 2 2
 rmarg|parity_rm|while lt c n bound 4096|while le c n bound 4096
 rmarg|parity_rm|if eq get a 0 2147483648|if eq get a 0 2147483649
 rmarg|parity_rm|ret and shr get a 0 4 1|ret and shr get a 0 3 1
+boot|parity_boot_gb20b|if ne pword pkt 8 n 56360962|if ne pword pkt 8 n 56360961
+boot|parity_boot_gb20b|if ne pword pkt add 20 mul k 4 n 0|if ne pword pkt add 20 mul k 4 n 1
+boot|parity_boot_gb20b|ret bact act 1 1504 0|ret bact act 1 1508 0
+boot|parity_boot_gb20b|if eq obs 255|if eq obs 254
+boot|parity_boot_gb20b|ret bact act 1 8653952 0|ret bact act 1 8653824 0
+boot|parity_boot_gb20b|ret bact act 2 8653504 33554432|ret bact act 2 8653504 16777216
+boot|parity_boot_gb20b|ret bact act 2 8653956 get st 11|ret bact act 2 8653952 get st 11
+boot|parity_boot_gb20b|if ne and get st 29 4294967167 353427070|if ne and get st 29 4294967167 336649854
+boot|parity_boot_gb20b|if ne get st 30 20|if ne get st 30 21
+boot|parity_boot_gb20b|if ne get st 31 0|if ne get st 31 1
+boot|parity_boot_gb20b|if eq and obs 4294967040 3135193344|if eq and obs 4294967040 0
+boot|parity_boot_gb20b|if or eq obs 0 eq and obs 4294967040 3135193344|if eq obs 0
 EOF
 if [ "$killed" -ne "$total" ]; then echo "MUTANTS FAIL killed=$killed/$total"; exit 1; fi
 echo "MUTANTS PASS killed=$killed/$total"

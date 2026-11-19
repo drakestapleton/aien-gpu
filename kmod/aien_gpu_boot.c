@@ -47,11 +47,12 @@ static int agpu_boot_mmio(struct agpu_dev *d, const u8 *in, struct agpu_boot_out
 	st[3] = blk32(in, 20);
 	for (i = 0; i < 4; i++)
 		st[4 + i] = blk32(in, 48 + 4 * i);
+	st[25] = (((d->info.boot42 >> 24) & 0x3fu) == 0x1bu) ? 1 : 0;
 	/*
 	 * om/boot.om bounds every wait by its budget; this cap only guards the glue against a
 	 * defect
 	 */
-	cap = 4096 + 4ull * (st[4] + st[5] + st[6] + st[7] + 4);
+	cap = 8192 + 8ull * (st[4] + st[5] + st[6] + st[7] + 4);
 	for (;;) {
 		rc = agpu_om("boot", agpu_om_boot, (u64)st, (u64)pkt, obs, (u64)act, 0, 0, &r);
 		if (rc)

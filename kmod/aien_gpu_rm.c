@@ -750,6 +750,7 @@ static int chan_build(struct agpu_file *f, struct agpu_chan *c, struct agpu_chan
 	/* 2.12: the token on the CPU; 2.14: schedule the TSG */
 	a[0] = rm->runlist;
 	a[1] = c->chid;
+	a[2] = (((d->info.boot42 >> 24) & 0x3fu) == 0x1bu) ? 1 : 0;
 	rc = rm_arg(rm, A_TOKEN, &r, &code);
 	if (rc) {
 		st_set(st, AGPU_RM_E_UNSUPPORTED, 20 + code, 0, S_SCHED);

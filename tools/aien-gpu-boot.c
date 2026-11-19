@@ -33,11 +33,50 @@ extern const char agpu_om_abi[];
 
 static const char *g_out;
 
+extern int gb20b_boot_build(gsp_arena *a, const gsp_boot_in *in, gsp_boot_plan *out, const char **why);
+extern const char agpu_om_boot[];
+
 static void die(int rc, const char *verdict, const char *what)
 {
 	fprintf(stderr, "aien-gpu-boot: %s\n", what);
 	printf("AIEN_GPU_BOOT: %s\n", verdict);
 	exit(rc);
+}
+
+static int pkg_is_gb20b(const char *dir)
+{
+	char p[4096], buf[64] = { 0 };
+	size_t n;
+	FILE *f;
+
+	snprintf(p, sizeof(p), "%s/profile.txt", dir);
+	f = fopen(p, "rb");
+	if (!f)
+		return 0;
+	n = fread(buf, 1, sizeof(buf) - 1, f);
+	fclose(f);
+	return n >= 5 && !strncmp(buf, "gb20b", 5);
+}
+
+static void load_bl_desc(const char *dir, uint32_t *code, uint32_t *data, uint32_t *manifest, size_t *sz)
+{
+	char p[4096], line[128];
+	FILE *f;
+	int got = 0;
+
+	snprintf(p, sizeof(p), "%s/bl_desc.txt", dir);
+	f = fopen(p, "r");
+	if (!f)
+		die(2, "PACKAGE-MISSING", p);
+	while (fgets(line, sizeof(line), f)) {
+		if (!strncmp(line, "code=", 5)) { *code = strtoul(line + 5, NULL, 0); got |= 1; }
+		else if (!strncmp(line, "data=", 5)) { *data = strtoul(line + 5, NULL, 0); got |= 2; }
+		else if (!strncmp(line, "manifest=", 9)) { *manifest = strtoul(line + 9, NULL, 0); got |= 4; }
+		else if (!strncmp(line, "size=", 5)) { *sz = strtoul(line + 5, NULL, 0); got |= 8; }
+	}
+	fclose(f);
+	if (got != 15)
+		die(2, "PACKAGE-BAD", "bl_desc.txt missing code/data/manifest/size");
 }
 
 static uint8_t *load(const char *dir, const char *name, size_t *n, size_t want)
@@ -145,9 +184,15 @@ int main(int argc, char **argv)
 	if (mkdir(g_out, 0755) && errno != EEXIST)
 		die(2, "TOOL-ERROR", g_out);
 
+	int is_gb20b = pkg_is_gb20b(pkg);
+	uint32_t bl_code = GSP_GB10B_BL_CODE_OFF, bl_data = GSP_GB10B_BL_DATA_OFF, bl_man = GSP_GB10B_BL_MANIFEST_OFF;
+	size_t want_bl = GSP_GB10B_BOOTLOADER_SIZE;
+
+	if (is_gb20b)
+		load_bl_desc(pkg, &bl_code, &bl_data, &bl_man, &want_bl);
 	in.rm_elf = load(pkg, "rm_elf.bin", &n_elf, 0);
 	in.rm_sig = load(pkg, "rm_sig.bin", &n_sig, 0);
-	in.bootloader = load(pkg, "bootloader.bin", &n_bl, GSP_GB10B_BOOTLOADER_SIZE);
+	in.bootloader = load(pkg, "bootloader.bin", &n_bl, want_bl);
 	in.fmc = load(pkg, "fmc.bin", &n_fmc, 0);
 	in.fmc_hash = load(pkg, "fmc_hash.bin", &n_h, GSP_COT_HASH_SIZE);
 	in.fmc_pubkey = load(pkg, "fmc_pkey.bin", &n_k, GSP_COT_KEY_SIZE);
@@ -159,9 +204,9 @@ int main(int argc, char **argv)
 	in.rm_sig_size = n_sig;
 	in.bootloader_size = n_bl;
 	in.fmc_size = n_fmc;
-	in.bl_code_off = GSP_GB10B_BL_CODE_OFF;
-	in.bl_data_off = GSP_GB10B_BL_DATA_OFF;
-	in.bl_manifest_off = GSP_GB10B_BL_MANIFEST_OFF;
+	in.bl_code_off = bl_code;
+	in.bl_data_off = bl_data;
+	in.bl_manifest_off = bl_man;
 
 	if (plan_only) {
 		/* host memory and stand-in device addresses below 40 bits */
@@ -180,6 +225,11 @@ int main(int argc, char **argv)
 			die(2, "NO-DEVICE", strerror(errno));
 		if (info.state != AGPU_STATE_BOUND || !info.fw_ok || !info.heap_bytes || !info.arena_bytes)
 			die(2, "NOT-READY", "module not in state BOUND with firmware, heap and arena");
+		{
+			uint32_t arch = (info.boot42 >> 24) & 0x3fu;
+			if ((is_gb20b && arch != 0x1bu) || (!is_gb20b && arch != 0x1au))
+				die(2, "PROFILE-MISMATCH", "boot package profile does not match chip BOOT_42 architecture");
+		}
 		base = mmap(NULL, info.arena_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 		if (base == MAP_FAILED)
 			die(2, "NO-DEVICE", "mmap arena");
@@ -204,7 +254,7 @@ int main(int argc, char **argv)
 	gsp_arena arena;
 	if (gsp_arena_init(&arena, base + GSP_PAGE, info.arena_iova + GSP_PAGE, info.arena_bytes - GSP_PAGE))
 		die(2, "BUILD-REFUSED", "arena not 4 KiB aligned");
-	if (gsp_boot_build(&arena, &in, &plan, &why))
+	if ((is_gb20b ? gb20b_boot_build : gsp_boot_build)(&arena, &in, &plan, &why))
 		die(2, "BUILD-REFUSED", why);
 	/* the COT packet goes into the arena right after the built blocks, where the module reads it */
 	cot_off = GSP_PAGE + ((arena.used + GSP_PAGE - 1) & ~(uint64_t)(GSP_PAGE - 1));
@@ -239,8 +289,26 @@ int main(int argc, char **argv)
 			die(2, "BLOCK-REFUSED", "om/abi.om refused the boot block");
 		}
 	}
+	if (is_gb20b) {
+		uint64_t bst[32] = { 0 }, bact[4] = { 0 }, br, ba[6];
+		bst[1] = plan.cot_packet_len;
+		bst[2] = plan.fmc_params.pa;
+		bst[3] = app_version;
+		bst[4] = bst[5] = bst[6] = bst[7] = polls;
+		bst[25] = 1;
+		ba[0] = (uint64_t)(uintptr_t)bst;
+		ba[1] = (uint64_t)(uintptr_t)plan.cot_packet;
+		ba[2] = 0;
+		ba[3] = (uint64_t)(uintptr_t)bact;
+		ba[4] = ba[5] = 0;
+		st = 0;
+		br = agpu_om_enter(agpu_om_boot, ba, &st);
+		if (st || br != 0 || bact[0] != 1 || bact[1] != 0x5e0u)
+			die(2, "COT-REFUSED", "om/boot.om refused GB20B COTv2 packet");
+	}
 	if (plan_only) {
-		printf("AIEN_GPU_BOOT: PLAN-ONLY arena used %#llx of %#llx, cot %u bytes at %#llx, app_version %u, tx_seq %u\n",
+		printf("AIEN_GPU_BOOT: PLAN-ONLY profile=%s arena used %#llx of %#llx, cot %u bytes at %#llx, app_version %u, tx_seq %u\n",
+		       is_gb20b ? "gb20b" : "gb10b",
 		       (unsigned long long)arena.used, (unsigned long long)arena.cap, plan.cot_packet_len,
 		       (unsigned long long)cot_off, app_version, plan.tx_seq);
 		return 0;

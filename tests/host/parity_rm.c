@@ -844,17 +844,22 @@ static void test_args(void)
 	eq("args handle 0", arg(3), FAIL + 7);
 	a[5] = 1ull << 32;
 	eq("args handle 33 bits", arg(3), FAIL + 7);
-	/* token: DOORBELL RUNLIST_ID 22:16, VECTOR 11:0 (gb100/dev_vm.h:620-625) */
+	/* token: GB10B (gb100/dev_vm.h:620-625) and GB20B bit-30 ENABLE (gb202/dev_vm.h:27-32) */
 	static const uint32_t tok[][2] = { { 0, 0 }, { 12, 5 }, { 63, 4095 }, { 1, 2048 } };
 	for (unsigned i = 0; i < sizeof(tok) / sizeof(tok[0]); i++) {
+		uint64_t base = DRF_NUM(_VIRTUAL, _FUNCTION_DOORBELL, _RUNLIST_ID, tok[i][0]) |
+				DRF_NUM(_VIRTUAL, _FUNCTION_DOORBELL, _VECTOR, tok[i][1]);
 		set4(tok[i][0], tok[i][1], 0, 0);
-		eq("token", arg(4), DRF_NUM(_VIRTUAL, _FUNCTION_DOORBELL, _RUNLIST_ID, tok[i][0]) |
-				    DRF_NUM(_VIRTUAL, _FUNCTION_DOORBELL, _VECTOR, tok[i][1]));
+		eq("token gb10b", arg(4), base);
+		set4(tok[i][0], tok[i][1], 1, 0);
+		eq("token gb20b", arg(4), base | (1ull << 30));
 	}
 	set4(64, 0, 0, 0);
 	eq("token runlist 64", arg(4), FAIL + 8);
 	set4(0, 4096, 0, 0);
 	eq("token chid 4096", arg(4), FAIL + 8);
+	set4(0, 0, 2, 0);
+	eq("token profile 2", arg(4), FAIL + 8);
 	/* unload waits */
 	set4(0x80000000u, 0, 0, 0);
 	eq("suspended", arg(5), 1);
