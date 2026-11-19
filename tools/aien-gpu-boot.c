@@ -179,6 +179,8 @@ int main(int argc, char **argv)
 		fd = open("/dev/aien-gpu", O_RDWR);
 		if (fd < 0 || ioctl(fd, AGPU_INFO, &info))
 			die(2, "NO-DEVICE", strerror(errno));
+		if (info.abi != AGPU_ABI_VERSION)
+			die(2, "ABI-MISMATCH", "module ABI version does not match aien-gpu-boot");
 		if (info.state != AGPU_STATE_BOUND || !info.fw_ok || !info.heap_bytes || !info.arena_bytes)
 			die(2, "NOT-READY", "module not in state BOUND with firmware, heap and arena");
 		/* the package and the start-up are GB20B's: architecture 0x1b, implementation 0xb */

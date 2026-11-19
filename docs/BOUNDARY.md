@@ -35,7 +35,7 @@ block on the chip checks the signature before it starts them, and we do not have
 | A SEC2 refusal is final | "A SEC2 refusal is final and is reported, never bypassed" | inventory:290 |
 | Chip root of trust | Hot Chips 2025 GB10 deck, p8: "Dual Secure Root support. SROOT Processor: NVIDIA Root for Secure Boot and NVIDIA secrets management. OSROOT Processor: Authentication and measurement of UEFI & OS & other System SW components" | `doc-page hc2025-nvidia-gb10-skende 8` |
 | No private key | We hold only the public key the driver ships; the matching private key is NVIDIA's | GPU_DRIVER.md:60-61 ("we do not have NVIDIA's signing key") |
-| SEC2's own firmware and boot ROM | Not loaded by the driver on GB10B; who loads SEC2 firmware before Linux (SoC boot chain, UEFI) is UNKNOWN | inventory:173-176 |
+| SEC2's own firmware and boot ROM | Not loaded by the driver on GB10B or GB20B (neither HAL loads SEC2 firmware; FWSEC/SoC boot runs before Linux); who loads SEC2 firmware before Linux (SoC boot chain, UEFI) is UNKNOWN | inventory:173-176; g_kernel_sec2_nvoc.c |
 | SoC firmware | UEFI and the rest of the SoC boot chain run before Linux and stay NVIDIA's; the state UEFI leaves SEC2 and the GPU in is UNKNOWN | inventory:54-56, 338-340 |
 
 DOCS SILENT on: whether SROOT is the key that signs or verifies the GSP-FMC chain (the deck names SROOT for secure boot

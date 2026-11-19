@@ -75,6 +75,9 @@ static int run_om(const struct g2sim_cfg *cfg, uint32_t len, uint32_t budget, st
 
 	g2sim_init(&sim_o, cfg);
 	regs = g2sim_regs(&sim_o);
+	/* Pre-fill output/scratch slots 8..31 so om/boot.om's entry zeroing loop is actively tested. */
+	for (int i = 8; i < 32; i++)
+		st[i] = 0xdeadbeefcafebabeULL;
 	st[1] = len;
 	st[2] = ARGS_PA;
 	st[3] = APP_VERSION;
@@ -151,7 +154,7 @@ static int same(const char *name)
 }
 
 /* One fault per scenario kind; kind 0 is the clean start-up. */
-#define KINDS 35u
+#define KINDS 38u
 static void fault(unsigned kind, struct g2sim_cfg *c)
 {
 	switch (kind) {
@@ -189,6 +192,9 @@ static void fault(unsigned kind, struct g2sim_cfg *c)
 	case 32: c->rsp_head = 0x40; break;                           /* a non-zero message-queue head */
 	case 33: c->rsp_head = 0x100; c->rsp_bytes = 0xffffff14u; break; /* tail 0x10 below head: 32-bit wrap */
 	case 34: c->rsp_bytes = 6; break;                             /* one dword read: no message header */
+	case 35: c->rsp_bytes = 3; break;                             /* below 4: refused before EMEM read/ack */
+	case 36: c->rsp_bytes = 5; break;                             /* smallest tail!=head size >= 4: 1 dword */
+	case 37: c->rsp_bytes = 19; break;                            /* 1 byte below 20: too short for response */
 	default: break;
 	}
 }

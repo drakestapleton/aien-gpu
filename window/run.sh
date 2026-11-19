@@ -177,7 +177,7 @@ stage_a() {
 	grep -q 'omega self-test PASS' "$EV/stageA-dmesg.txt" || return 1
 	grep -q ' bound: BOOT_0' "$EV/stageA-dmesg.txt" || return 1
 	S "$BOOT" --info > "$EV/stageA-info.txt" 2>&1 || return 1
-	grep -q '^AIEN_GPU_INFO: abi=1 state=1 .*fw_ok=1' "$EV/stageA-info.txt"
+	grep -q '^AIEN_GPU_INFO: abi=2 state=1 .*fw_ok=1' "$EV/stageA-info.txt"
 }
 # ---- W8 stage B: GSP-RM started by our code, INIT_DONE ----
 stage_b() {

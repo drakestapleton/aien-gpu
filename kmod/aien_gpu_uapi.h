@@ -11,7 +11,8 @@
 #include <linux/ioctl.h>
 #include <linux/types.h>
 
-#define AGPU_ABI_VERSION 1
+/* v2: GB20B agpu_boot_out (sec2_err, sec2_rsp_*, polls0, stages 9..11) */
+#define AGPU_ABI_VERSION 2
 
 /* Device state, AGPU_INFO.state */
 enum agpu_state {

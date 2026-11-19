@@ -123,10 +123,12 @@ kernel module? Answer, with evidence from this repository:
 Recorded host dependencies (not Omega yet, each with its successor):
 
 - The GSP boot package builder: aienux `native/kernel/dev/gb10_gsp_boot.c` at c9678d7b (C, L192),
-  linked into `tools/aien-gpu-boot` from the pinned clone; extractors and `window1-package.sh` from the
-  same clone (`tools/package.sh`). Successor: a program-mode `.om` port of `gsp_boot_build` and the
-  extractors, checked byte for byte against the C on the real package (`tests/host/plan_test.sh`
-  already builds that package on the host).
+  extended for GB20B by `tools/gb20b_gsp_boot.[ch]` (GB20B boot-loader geometry, COT version 2 with
+  zero FRTS fields, and CrashCat queue at WprMeta 224/232; `_Static_assert`s pin the inherited
+  133 MiB FW heap and 7 log buffers shared by GB10B|GB20B), linked into `tools/aien-gpu-boot` from
+  the pinned clone; extractors from the same clone (`tools/package.sh`). Successor: a program-mode
+  `.om` port (`omega-gpu-driver gsp/arena.om`) checked byte for byte against the C on the real
+  package (`tests/host/plan_test.sh` already builds that package on the host).
 - The test oracles (aienux C) are test-only and fetched by pin; nothing of them is in the module.
 
 ## 6. Stages and states

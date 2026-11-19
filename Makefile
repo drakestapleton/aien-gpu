@@ -9,7 +9,8 @@
 
 OMC ?= $(error set OMC=/path/to/omega-mv/seed/out/omc (sha256 $(OMC_SHA256)))
 OMC_SHA256 := 189ada82e00bb440cb41351bd252cc68c54a1b1050051cc42a1df700081c3b54
-ORACLE_REPO := https://github.com/aien-dev/aienux.git
+# Offline-first local mirror discovery for ORACLE_REV; override with ORACLE_REPO=/path/or/url.
+ORACLE_REPO ?=
 ORACLE_REV := c9678d7b5286b15cfdb92a648264de6d3e9e72ac
 KDIR ?= /lib/modules/$(shell uname -r)/build
 B := build
@@ -44,11 +45,19 @@ $(B)/agpu_om.o: kmod/agpu_om.S om
 	$(CC) -c -Wa,-I$(B) -o $@ $<
 
 ORACLE := $(B)/oracle
-$(ORACLE)/.rev:
-	rm -rf $(ORACLE)
-	git clone -q --filter=blob:none $(ORACLE_REPO) $(ORACLE)
-	git -C $(ORACLE) checkout -q $(ORACLE_REV)
-	git -C $(ORACLE) rev-parse HEAD > $@
+$(ORACLE)/.rev: | $(B)
+	@set -e; rm -rf $(ORACLE); src="$(ORACLE_REPO)"; \
+	if [ -z "$$src" ]; then \
+		for c in "$(HOME)/git/aienux.git" "$(HOME)/workspace/aienux-nonv" "$(HOME)/workspace/aienux-mt7925-vfio" "$(HOME)/workspace/cudafix-FixAienGpu/aien-gpu/build/oracle"; do \
+			if [ -d "$$c" ] && git -C "$$c" cat-file -t $(ORACLE_REV) >/dev/null 2>&1; then src="$$c"; break; fi; \
+		done; \
+		[ -n "$$src" ] || src="https://interplane.io/drakestapleton/aienux.git"; \
+	fi; \
+	case "$$src" in http://*|https://*) git clone -q --filter=blob:none "$$src" $(ORACLE) ;; *) git clone -q "$$src" $(ORACLE) ;; esac; \
+	git -C $(ORACLE) checkout -q $(ORACLE_REV); \
+	got=$$(git -C $(ORACLE) rev-parse HEAD); \
+	[ "$$got" = "$(ORACLE_REV)" ] || { echo "ORACLE HEAD $$got != $(ORACLE_REV)"; exit 1; }; \
+	echo "$$got" > $@
 
 OGPU := $(ORACLE)/native/kernel/gpu
 ODEV := $(ORACLE)/native/kernel/dev
@@ -91,6 +100,10 @@ $(B)/aien-gpu-boot: tools/aien-gpu-boot.c tools/gb20b_gsp_boot.c tools/gb20b_gsp
 $(B)/cot_boot: tests/host/cot_boot.c tests/host/gb20b_sim.c tests/host/gb20b_sim.h tests/host/gb20b_mmio.h $(B)/agpu_om.o $(ORACLE)/.rev
 	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< tests/host/gb20b_sim.c $(B)/agpu_om.o
 
+# direct unit tests & negative controls for tools/gb20b_gsp_boot.c (reaches builder size/offset checks)
+$(B)/test_gb20b_builder: tests/host/test_gb20b_builder.c tools/gb20b_gsp_boot.c tools/gb20b_gsp_boot.h $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) -I tools $(OCFLAGS) -o $@ $< tools/gb20b_gsp_boot.c
+
 # CUDA++ m16 gate over /dev/aien-gpu (stage C); --dry-run needs no device
 $(B)/aien-gpu-m16: tools/aien-gpu-m16.c kmod/aien_gpu_uapi.h | $(B)
 	$(CC) $(HOSTCFLAGS) -I kmod -o $@ $<
@@ -98,7 +111,7 @@ $(B)/aien-gpu-m16: tools/aien-gpu-m16.c kmod/aien_gpu_uapi.h | $(B)
 TOOLS := aien-gpu-boot aien-gpu-m16
 tools: $(TOOLS:%=$(B)/%)
 
-HOST_TESTS := unit_test parity_boot parity_seq parity_mq parity_gmmu parity_rm
+HOST_TESTS := unit_test parity_boot test_gb20b_builder parity_seq parity_mq parity_gmmu parity_rm
 host-test: $(HOST_TESTS:%=$(B)/%) tools $(B)/cot_boot
 	@set -e; for t in $(HOST_TESTS); do ./$(B)/$$t; done
 	sh tests/host/kcheck_controls.sh $(B)/kcheck

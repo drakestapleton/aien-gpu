@@ -28,6 +28,11 @@ _Static_assert(offsetof(gsp_mirror_wpr_meta, elfDataOffset) == 224, "sysmemAddrO
 _Static_assert(offsetof(gsp_mirror_wpr_meta, elfDataSize) == 232, "sizeOfCrashReportQueue at 232");
 _Static_assert(offsetof(gsp_mirror_cot, frtsSysmemOffset) == 12 && offsetof(gsp_mirror_cot, frtsVidmemSize) == 32,
 	       "COT FRTS fields are payload bytes 12..35");
+/* Shared GB10B|GB20B HALs verified in open-gpu-kernel-modules 580.173.02 generated/g_kernel_gsp_nvoc.c:
+ * kgspGetMinWprHeapSizeMB_647ce6, kgspGetMaxWprHeapSizeMB_aa578c, kgspGetFwHeapParamOsCarveoutSize,
+ * kgspPopulateWprMeta_GB10B, kgspGetLogCount_520858. Assert the inherited macros explicitly. */
+_Static_assert(GSP_GB10B_FW_HEAP_SIZE == (133ULL << 20), "GB20B WPR FW heap size is 133 MiB (139460608 B)");
+_Static_assert(GSP_GB10B_LOG_COUNT == 7u, "GB20B libos log buffer count is 7");
 
 int gsp_boot_build_gb20b(gsp_arena *a, const gsp_boot_in *in, gsp_boot_plan *out, gsp_region *crash,
 			 const char **why)

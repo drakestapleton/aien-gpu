@@ -27,12 +27,13 @@ srcs() { # test -> extra C sources
 }
 killed=0
 total=0
-while IFS='|' read -r unit test from to; do
+while IFS='|' read -r unit test from to occ; do
 	[ -n "$unit" ] || continue
+	occ=${occ:-1}
 	total=$((total + 1))
 	rm -rf "$T/u"; mkdir -p "$T/u"
 	cp "$B"/*.bin "$T/u/"
-	awk -v f="$from" -v t="$to" 'BEGIN{done=0} { if (!done) { i = index($0, f); if (i) { $0 = substr($0, 1, i-1) t substr($0, i+length(f)); done=1 } } print } END{ if (!done) exit 3 }' \
+	awk -v f="$from" -v t="$to" -v want="$occ" 'BEGIN{seen=0; done=0} { if (!done) { i = index($0, f); if (i) { seen++; if (seen == want) { $0 = substr($0, 1, i-1) t substr($0, i+length(f)); done=1 } } } print } END{ if (!done) exit 3 }' \
 		"$ROOT/om/$unit.om" > "$T/m.om" || { echo "MUTANTS FAIL pattern not found in $unit: $from"; exit 1; }
 	if ! "$OMC" < "$T/m.om" > "$T/u/$unit.bin" 2> "$T/omc.err"; then
 		echo "mutant $total ($unit) refused by omc: $(cat "$T/omc.err")"; killed=$((killed + 1)); continue
@@ -47,7 +48,8 @@ while IFS='|' read -r unit test from to; do
 	killed=$((killed + 1))
 done <<'EOF'
 boot|parity_boot|ret bact act 2 8653828 sub mul dw 4 4|ret bact act 2 8653828 sub mul dw 4 0
-boot|parity_boot|if ge n get st 4|if gt n get st 4
+boot|parity_boot|if ge n get st 4|if gt n get st 4|1
+boot|parity_boot|if ge n get st 4|if gt n get st 4|2
 boot|parity_boot|ne and obs 4294967040 3135193344|ne and obs 4294967040 0
 boot|parity_boot|if eq and obs 128 0|if eq and obs 64 0
 boot|parity_boot|if eq obs shr pa 32|if eq obs shr pa 31
@@ -57,6 +59,7 @@ boot|parity_boot|if ne get st 11 obs|if eq get st 11 obs
 boot|parity_boot|if ge n get st 5|if gt n get st 5
 boot|parity_boot|sz = and sub add add obs 4294967296 4 get st 11 4294967295|sz = and sub add add obs 4294967296 0 get st 11 4294967295
 boot|parity_boot|if or lt sz 4 gt sz 1024|if or lt sz 4 gt sz 1028
+boot|parity_boot|if or lt sz 4 gt sz 1024|if or lt sz 1 gt sz 1024
 boot|parity_boot|ret bact act 2 8653504 33554432|ret bact act 2 8653504 16777216
 boot|parity_boot|ret bact act 2 8653956 get st 11|ret bact act 2 8653952 get st 11
 boot|parity_boot|if ne ememdw get st 10 div sz 4|if ne ememdw get st 10 ememdw get st 10
@@ -65,6 +68,8 @@ boot|parity_boot|if ne and shr d1 8 65535 4318|if ne and shr d1 16 255 16
 boot|parity_boot|if or ne som 1 ne eom 1|if ne som 1
 boot|parity_boot|if and ne t 21 ne t 24|if and ne t 21 ne t 20
 boot|parity_boot|if lt sz 20|if lt sz 16
+boot|parity_boot|if lt sz 20|if lt sz 19
+boot|parity_boot|for k ulong 24|for k ulong 20
 boot|parity_boot|if ne get st 19 0|if ne get st 19 get st 19
 boot|parity_boot|if eq i 4|if eq i 5
 seal|parity_mq|put32 m 32 xor shr x 32 and x 4294967295|put32 m 32 and x 4294967295
