@@ -262,9 +262,11 @@ int main(int argc, char **argv)
 			out_bytes(name, buf, r.size);
 		free(buf);
 	}
-	printf("AIEN_GPU_BOOT: %s code=%u stage=%u polls=%u,%u,%u,%u sec2_mb0=%#x gsp_mb0=%#x cpuctl=%#x msgs=%u last_fn=%#x seq_runs=%u mmio_us=%llu wait_us=%llu\n",
-	       verdict_name(req.out.verdict), req.out.code, req.out.stage, req.out.polls[0], req.out.polls[1],
-	       req.out.polls[2], req.out.polls[3], req.out.sec2_mb0, req.out.gsp_mb0, req.out.cpuctl, req.out.msgs,
+	printf("AIEN_GPU_BOOT: %s code=%u stage=%u polls=%u,%u,%u,%u,%u sec2_err=%#x sec2_rsp=%u,%#x,%#x,%#x hwcfg2=%#x gsp_mb0=%#x cpuctl=%#x msgs=%u last_fn=%#x seq_runs=%u mmio_us=%llu wait_us=%llu\n",
+	       verdict_name(req.out.verdict), req.out.code, req.out.stage, req.out.polls0, req.out.polls[0],
+	       req.out.polls[1], req.out.polls[2], req.out.polls[3], req.out.sec2_err, req.out.sec2_rsp_bytes,
+	       req.out.sec2_rsp_hdr[0], req.out.sec2_rsp_hdr[1], req.out.sec2_rsp_cmd, req.out.hwcfg2,
+	       req.out.gsp_mb0, req.out.cpuctl, req.out.msgs,
 	       req.out.last_fn, req.out.seq_runs, (unsigned long long)req.out.mmio_us,
 	       (unsigned long long)req.out.wait_us);
 	return req.out.verdict == AGPU_BOOT_INIT_DONE ? 0 : 1;

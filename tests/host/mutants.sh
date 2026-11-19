@@ -18,7 +18,7 @@ NVSRC=${NVSRC:-$HOME/workspace/_ext/open-gpu-kernel-modules-580.173.02/src}
 CF="$CF -I $NVSRC/common/sdk/nvidia/inc -I $NVSRC/common/sdk/nvidia/inc/ctrl -I $NVSRC/common/inc"
 srcs() { # test -> extra C sources
 	case $1 in
-	parity_boot) echo "$ORACLE/gpu/gsp_mmio.c $ORACLE/gpu/gsp_sim.c" ;;
+	parity_boot) echo "$ROOT/tests/host/gb20b_mmio.c $ROOT/tests/host/gb20b_sim.c" ;;
 	parity_seq) echo "$ORACLE/gpu/gsp_seq.c" ;;
 	parity_mq) echo "$ORACLE/dev/gb10_gsp_boot.c" ;;
 	parity_rm) echo "$ORACLE/dev/gb10_gsp_boot.c" ;;
@@ -51,6 +51,22 @@ boot|parity_boot|if ge n get st 4|if gt n get st 4
 boot|parity_boot|ne and obs 4294967040 3135193344|ne and obs 4294967040 0
 boot|parity_boot|if eq and obs 128 0|if eq and obs 64 0
 boot|parity_boot|if eq obs shr pa 32|if eq obs shr pa 31
+boot|parity_boot|if eq obs 255|if eq and obs 255 255
+boot|parity_boot|ret bact act 1 1504 0|ret bact act 1 1508 0
+boot|parity_boot|if ne get st 11 obs|if eq get st 11 obs
+boot|parity_boot|if ge n get st 5|if gt n get st 5
+boot|parity_boot|sz = and sub add add obs 4294967296 4 get st 11 4294967295|sz = and sub add add obs 4294967296 0 get st 11 4294967295
+boot|parity_boot|if or lt sz 4 gt sz 1024|if or lt sz 4 gt sz 1028
+boot|parity_boot|ret bact act 2 8653504 33554432|ret bact act 2 8653504 16777216
+boot|parity_boot|ret bact act 2 8653956 get st 11|ret bact act 2 8653952 get st 11
+boot|parity_boot|if ne ememdw get st 10 div sz 4|if ne ememdw get st 10 ememdw get st 10
+boot|parity_boot|if ne and d1 127 126|if ne and d1 126 126
+boot|parity_boot|if ne and shr d1 8 65535 4318|if ne and shr d1 16 255 16
+boot|parity_boot|if or ne som 1 ne eom 1|if ne som 1
+boot|parity_boot|if and ne t 21 ne t 24|if and ne t 21 ne t 20
+boot|parity_boot|if lt sz 20|if lt sz 16
+boot|parity_boot|if ne get st 19 0|if ne get st 19 get st 19
+boot|parity_boot|if eq i 4|if eq i 5
 seal|parity_mq|put32 m 32 xor shr x 32 and x 4294967295|put32 m 32 and x 4294967295
 seq|parity_seq|ret 5|ret 4
 seq|parity_seq|ge get ops add base 2 8|ge get ops add base 2 9

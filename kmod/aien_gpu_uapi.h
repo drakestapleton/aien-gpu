@@ -45,7 +45,7 @@ enum agpu_boot_verdict {
 	AGPU_BOOT_INIT_DONE = 1,	/* GSP-RM sent GSP_INIT_DONE */
 	/* the block failed om/abi.om (out.code); the chip was not touched */
 	AGPU_BOOT_REFUSED = 2,
-	AGPU_BOOT_MMIO_STOPPED = 3,	/* the 11 register steps stopped: out.stage says where */
+	AGPU_BOOT_MMIO_STOPPED = 3,	/* the 12 register steps stopped: out.stage says where */
 	AGPU_BOOT_QUEUE_ERROR = 4,	/* a status-queue message failed om/mqget.om (out.code) */
 	AGPU_BOOT_SEQ_REFUSED = 5,	/* a sequencer request failed om/seq.om (out.code) */
 	/* a sequencer list stopped: poll (out.code 1) or core operation (2) */
@@ -56,21 +56,31 @@ enum agpu_boot_verdict {
 
 struct agpu_boot_out {
 	__u32 verdict;		/* enum agpu_boot_verdict */
-	__u32 code;		/* refusal code of the Omega unit named by the verdict */
 	/*
-	 * om/boot.om stage: 0 ok, 1 arg, 2 busy, 3 emem, 4 sec2, 5 mask, 6 lockdown, 7 fmc, 8 riscv
+	 * refusal code of the Omega unit named by the verdict; with MMIO_STOPPED and stage 10 the
+	 * reason the SEC2 reply was refused: 1 size, 2 read pointer, 3 not one packet,
+	 * 4 message type, 5 vendor, 6 NVDM type, 7 too short
+	 */
+	__u32 code;
+	/*
+	 * om/boot.om stage: 0 ok, 1 arg, 2 busy, 3 emem, 4 sec2 (no reply), 5 mask, 6 lockdown,
+	 * 7 fmc, 8 riscv, 9 secure boot not done, 10 reply refused, 11 SEC2 reported an error
 	 */
 	__u32 stage;
 	__u32 polls[4];
 	__u32 dwords, ememc_after;
-	__u32 sec2_mb0, sec2_mb1, hwcfg2, gsp_mb0, gsp_mb1, cpuctl;
+	/* the SEC2 reply: its error code and size in bytes (GB20B has no SEC2 mailbox step) */
+	__u32 sec2_err, sec2_rsp_bytes;
+	__u32 hwcfg2, gsp_mb0, gsp_mb1, cpuctl;
 	__u32 msgs;		/* status-queue messages read */
 	__u32 last_fn;		/* function of the last message */
 	__u32 seq_runs;		/* sequencer requests performed */
 	__u32 seq_ops;		/* operations of the last one performed */
 	__u32 rx_seq;		/* next expected status-queue sequence number */
 	__u64 mmio_us, wait_us;	/* time in the register steps, time waiting for INIT_DONE */
-	__u32 reserved[4];
+	__u32 polls0;		/* polls used by step 0 (secure boot done) */
+	__u32 sec2_rsp_hdr[2];	/* reply dwords 0 and 1: MCTP header, message header */
+	__u32 sec2_rsp_cmd;	/* reply command type (0x14 = the COT command) */
 };
 
 struct agpu_boot {

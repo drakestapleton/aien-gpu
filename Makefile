@@ -53,8 +53,11 @@ OGPU := $(ORACLE)/native/kernel/gpu
 ODEV := $(ORACLE)/native/kernel/dev
 OCFLAGS := -I $(OGPU) -I $(ODEV) -Wno-unused-parameter -Wno-sign-compare
 
-$(B)/parity_boot: tests/host/parity_boot.c $(B)/agpu_om.o $(ORACLE)/.rev
-	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(OGPU)/gsp_mmio.c $(OGPU)/gsp_sim.c $(B)/agpu_om.o
+# om/boot.om against the GB20B reference and simulator in tests/host (written from NVIDIA's
+# 580.173.02 GB20B HALs); the oracle only lends struct ck_gpu_regs (gmmu.h).
+G2 := tests/host/gb20b_mmio.c tests/host/gb20b_sim.c
+$(B)/parity_boot: tests/host/parity_boot.c $(G2) tests/host/gb20b_mmio.h tests/host/gb20b_sim.h $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(G2) $(B)/agpu_om.o
 
 $(B)/parity_seq: tests/host/parity_seq.c $(B)/agpu_om.o $(ORACLE)/.rev
 	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(OGPU)/gsp_seq.c $(B)/agpu_om.o
