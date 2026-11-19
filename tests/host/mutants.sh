@@ -3,6 +3,8 @@
 # mutants.sh OMC BUILD -- each line below plants one small mistake in one Omega unit (a literal,
 # single-line replacement), rebuilds that unit with the pinned omc, links the host test that must
 # notice it, and requires that test to FAIL. A mutant that still passes means the tests are too weak.
+# Line format: unit|test|from|to[|n]. The n-th line of the unit that contains `from` is changed
+# (default the first), so two lines with the same text each get a mutant of their own.
 # Prints MUTANTS PASS killed=N/N or the surviving mutant; exit status 0 only when all are killed.
 set -u
 OMC=${1:?usage: mutants.sh OMC BUILD}
@@ -86,6 +88,8 @@ ident|unit_test|if ne arch 27|if and ne arch 26 ne arch 27
 ident|unit_test|if ne arch 27|if ne arch 28
 ident|unit_test|if ne and shr boot42 20 15 11|if ne and shr boot42 20 15 12
 abi|unit_test|for k ulong 52|for k ulong 51
+abi|unit_test|if ne ld32 a 0 2|if ne ld32 a 0 1
+abi|unit_test|if ne ld32 a 0 2|if lt ld32 a 0 2
 abi|unit_test|if or eq p 0 gt p 1000|if or eq p 0 gt p 1001
 gmmu|parity_gmmu|ret or or pa 16 shl ap 1|ret or or pa 8 shl ap 1
 gmmu|parity_gmmu|pcf = add 16 and fl 1|pcf = add 0 and fl 1

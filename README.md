@@ -41,7 +41,8 @@ make OMC=/path/to/omega-mv/seed/out/omc check   # om, kcheck, host tests, mutant
 `OMC` must be the seeded compiler with sha256
 `189ada82e00bb440cb41351bd252cc68c54a1b1050051cc42a1df700081c3b54` (omega-mv main `91b3c932`; requalified
 2026-10-26: every unit `KCHECK PASS`, all host gates, mutants 57/57, module build, QEMU cases).
-The test oracles are the earlier C of this work, fetched by pin from aien-dev/aienux `c9678d7b`.
+The test oracles are the earlier C of this work, aien-dev/aienux `feat/own-gpu-driver` at `c9678d7b`, kept in this repository as the branch
+`oracle/aienux-c9678d7b` (the Makefile checks the commit id).
 
 ## Licence
 
@@ -60,4 +61,6 @@ it, are dual MIT/GPL, the same as NVIDIA's open kernel module.
 | `docs/DESIGN.md` | module or VFIO, the ABI choice, Omega in the kernel, the Omega/C split |
 | `docs/STAGE-C.md` | the RM bring-up after GSP-RM is up, with NVIDIA source citations |
 | `docs/STATUS.md` | evidence level of every part |
+| `docs/calc-receipts/` | `aien-calc` receipts of the decimal constants in the Omega units |
+| `docs/proofs/` | Lean 4 proofs about a hand-written model of the GB20B start-up |
 | `window/` | the hardware window: ordered script, rollback, timing, root commands |

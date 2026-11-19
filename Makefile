@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: MIT OR GPL-2.0-only
 # aien-gpu: build the Omega units, check them, run the host tests, build the module.
 #   make om          compile om/*.om with the pinned omc, run tools/kcheck on every unit
-#   make host-test   unit tests and parity against the C oracles (aienux c9678d7b, fetched by pin)
+#   make host-test   unit tests and parity against the C oracles (aienux c9678d7b, kept in this
+#                    repository as the branch oracle/aienux-c9678d7b)
 #   make kmod        build kmod/aien_gpu.ko against the running kernel's headers (never loads it) and
 #                    check that it holds the units of this build (tools/ko-units.sh)
 #   make check       om + host-test + kmod + static checks
@@ -9,8 +10,12 @@
 
 OMC ?= $(error set OMC=/path/to/omega-mv/seed/out/omc (sha256 $(OMC_SHA256)))
 OMC_SHA256 := 189ada82e00bb440cb41351bd252cc68c54a1b1050051cc42a1df700081c3b54
-# Offline-first local mirror discovery for ORACLE_REV; override with ORACLE_REPO=/path/or/url.
-ORACLE_REPO ?=
+# The C oracles are aien-dev/aienux feat/own-gpu-driver at ORACLE_REV. That commit is kept in this
+# repository as the branch ORACLE_REF (a history of its own), so a clone needs no other repository:
+# a normal clone already holds the commit, a single-branch clone fetches the branch from ORACLE_REPO
+# (a remote name, path or URL of this repository). No other place is searched.
+ORACLE_REPO ?= origin
+ORACLE_REF := oracle/aienux-c9678d7b
 ORACLE_REV := c9678d7b5286b15cfdb92a648264de6d3e9e72ac
 KDIR ?= /lib/modules/$(shell uname -r)/build
 B := build
@@ -46,15 +51,11 @@ $(B)/agpu_om.o: kmod/agpu_om.S om
 
 ORACLE := $(B)/oracle
 $(ORACLE)/.rev: | $(B)
-	@set -e; rm -rf $(ORACLE); src="$(ORACLE_REPO)"; \
-	if [ -z "$$src" ]; then \
-		for c in "$(HOME)/git/aienux.git" "$(HOME)/workspace/aienux-nonv" "$(HOME)/workspace/aienux-mt7925-vfio" "$(HOME)/workspace/cudafix-FixAienGpu/aien-gpu/build/oracle"; do \
-			if [ -d "$$c" ] && git -C "$$c" cat-file -t $(ORACLE_REV) >/dev/null 2>&1; then src="$$c"; break; fi; \
-		done; \
-		[ -n "$$src" ] || src="https://interplane.io/drakestapleton/aienux.git"; \
-	fi; \
-	case "$$src" in http://*|https://*) git clone -q --filter=blob:none "$$src" $(ORACLE) ;; *) git clone -q "$$src" $(ORACLE) ;; esac; \
-	git -C $(ORACLE) checkout -q $(ORACLE_REV); \
+	@set -e; rm -rf $(ORACLE); \
+	git cat-file -e $(ORACLE_REV)^{commit} 2>/dev/null || git fetch -q $(ORACLE_REPO) $(ORACLE_REF) || \
+		{ echo "oracle: $(ORACLE_REV) is not in this clone and git fetch $(ORACLE_REPO) $(ORACLE_REF) failed"; exit 1; }; \
+	git clone -q --shared --no-checkout "$(CURDIR)" $(ORACLE); \
+	git -C $(ORACLE) checkout -q --detach $(ORACLE_REV); \
 	got=$$(git -C $(ORACLE) rev-parse HEAD); \
 	[ "$$got" = "$(ORACLE_REV)" ] || { echo "ORACLE HEAD $$got != $(ORACLE_REV)"; exit 1; }; \
 	echo "$$got" > $@

@@ -49,7 +49,11 @@ foff=$1
 cp "$KO" "$T/flip.ko" || exit 1
 orig=$(od -An -tu1 -j "$foff" -N 1 "$T/flip.ko" | tr -d " \n")
 flipped=$((orig ^ 1))
-printf "\$(printf "%03o" "$flipped")" | dd of="$T/flip.ko" bs=1 seek="$foff" count=1 conv=notrunc 2>/dev/null || exit 1
+printf "\\$(printf %03o "$flipped")" | dd of="$T/flip.ko" bs=1 seek="$foff" count=1 conv=notrunc 2>/dev/null || exit 1
+now=$(od -An -tu1 -j "$foff" -N 1 "$T/flip.ko" | tr -d " \n")
+if [ "$now" != "$flipped" ] || [ "$(cmp -l "$KO" "$T/flip.ko" | wc -l)" -ne 1 ]; then
+	echo "KO-UNITS FAIL control: the copy of $KO does not differ in bit 0 of exactly one byte (byte $foff: $orig -> $now)"; exit 1
+fi
 unit_bytes "$T/flip.ko" "$u" "$T/flip.ko.bin" || exit 1
 if cmp -s "$T/flip.ko.bin" "$B/$u.bin"; then
 	echo "KO-UNITS FAIL control: a 1-bit flipped $u inside copy of $KO compared equal"; exit 1

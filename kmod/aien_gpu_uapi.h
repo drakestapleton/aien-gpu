@@ -11,8 +11,21 @@
 #include <linux/ioctl.h>
 #include <linux/types.h>
 
-/* v2: GB20B agpu_boot_out (sec2_err, sec2_rsp_*, polls0, stages 9..11) */
-#define AGPU_ABI_VERSION 2
+/*
+ * The ABI as clients see it (AGPU_INFO.abi). It stays 1: no request a compute client sends (INFO,
+ * RM_INIT, MEM_*, CHAN_*, mmap) changed for GB20B, and the CUDA++ client refuses any other value
+ * (CUDApp src/omega_gpu_platform_aien.c, built against its own copy of this header).
+ */
+#define AGPU_ABI_VERSION 1
+/*
+ * Version of the AGPU_BOOT block, in[0..3], checked by om/abi.om (refusal 2). Only AGPU_BOOT
+ * returns struct agpu_boot_out, so its layout is versioned here and not by AGPU_ABI_VERSION.
+ * 2: GB20B. The reply of SEC2 (sec2_err, sec2_rsp_*), polls0, stages 9..11, and with stage 10
+ *    the refusal reason in `code`.
+ * 1: GB10B (sec2_mb0, sec2_mb1, reserved[4]). Refused: a tool built for that layout would
+ *    mislabel the new fields, and this tool is refused by a module that still has it.
+ */
+#define AGPU_BOOT_VERSION 2
 
 /* Device state, AGPU_INFO.state */
 enum agpu_state {

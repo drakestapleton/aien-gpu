@@ -222,7 +222,7 @@ int main(int argc, char **argv)
 	out_bytes("cot_packet.bin", plan.cot_packet, plan.cot_packet_len);
 
 	memset(req.in, 0, sizeof(req.in));
-	put32(req.in, 0, 1);
+	put32(req.in, 0, AGPU_BOOT_VERSION);
 	put64(req.in, 8, cot_off);
 	put32(req.in, 16, plan.cot_packet_len);
 	put32(req.in, 20, app_version);

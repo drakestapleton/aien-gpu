@@ -87,7 +87,7 @@ static int agpu_selftest(void)
 	rc |= agpu_om("ident", agpu_om_ident, 0x1b36, 0x0005, 4096, 0, 0, 0, &r) ?:
 	      st_check("ident other vendor", r == 1);
 	/* a valid AGPU_BOOT block (tests/host/unit_test.c good_boot) */
-	st_put32(blk, 1);
+	st_put32(blk, AGPU_BOOT_VERSION);
 	st_put32(blk + 8, 0x1000);
 	st_put32(blk + 16, 868);
 	st_put32(blk + 24, 0x2000);
@@ -100,7 +100,7 @@ static int agpu_selftest(void)
 	st_put32(blk + 68, 30000);
 	rc |= agpu_om("abi", agpu_om_abi, 1, (u64)blk, 0x800000000ull, 64ull << 20, 0, 0, &r) ?:
 	      st_check("abi accept", r == 0);
-	blk[0] = 2;
+	blk[0] = 1;	/* the GB10B-era block */
 	rc |= agpu_om("abi", agpu_om_abi, 1, (u64)blk, 0x800000000ull, 64ull << 20, 0, 0, &r) ?:
 	      st_check("abi version", r == 2);
 	if (rc)
