@@ -9,7 +9,7 @@
  * (v & mask) == val with the same budget rule as the aienux oracle gsp_seq.c: budget reads after
  * the first, at least one.
  * Core operations (reset, start, wait, resume of the GSP falcon) are refused with AGPU_SEQ_E_CORE:
- * they restart the chip, NVIDIA's source cannot tell what GSP-RM expects of them on GB10B, so they
+ * they restart the chip, NVIDIA's source cannot tell what GSP-RM expects of them on this chip, so they
  * wait for chip evidence instead of a guess.
  */
 #ifndef AGPU_EXEC_H

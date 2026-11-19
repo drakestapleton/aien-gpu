@@ -707,7 +707,7 @@ static int chan_build(struct agpu_file *f, struct agpu_chan *c, struct agpu_chan
 	rc = chan_buffers(f, c, st);
 	if (rc)
 		return rc;
-	/* 2.8 TSG, then its fault-method buffers (one per runqueue, 2 on GB10B) */
+	/* 2.8 TSG, then its fault-method buffers (one per runqueue, 2 on GB10B and GB20B) */
 	rc = rm_alloc4(d, B_TSG, fx->h_client, fx->h_device, c->h_tsg, fx->h_vas, st, S_TSG);
 	if (rc)
 		return rc;

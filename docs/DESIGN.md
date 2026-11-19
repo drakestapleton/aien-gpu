@@ -111,7 +111,7 @@ kernel module? Answer, with evidence from this repository:
 |---|---|---|
 | Is this PCI function our GB10? (vendor, device, BAR0 size; BOOT_0, BOOT_42 arch 0x1a impl 0xb) | `om/ident.om` | read the PCI fields and two registers |
 | Is an ioctl block acceptable? | `om/abi.om` (+ stage-C units) | copy in/out |
-| The 11 GSP start-up register steps, their order, values and budgets | `om/boot.om` (a step machine) | perform one read, write or pause per call |
+| The 12 GSP start-up register steps, their order, values and budgets | `om/boot.om` (a step machine) | perform one read, write or pause per call |
 | A GSP "run CPU sequencer" request: check it whole, normalize it | `om/seq.om` | `kmod/agpu_exec.h`: perform the checked list |
 | A command-queue message: headers, checksum, padding | `om/seal.om` | put the payload at byte 80 |
 | Ring placement, wrap and full check | `om/mqput.om` | fence, publish the write pointer, notify |

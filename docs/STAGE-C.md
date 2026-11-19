@@ -4,6 +4,12 @@ Chip: the Spark's GPU is GB20B (docs/STATUS.md, 2026-11-18). This document was w
 A HAL audit of every `generated/g_*_nvoc.c` at this tag found one difference from GB10B in what stage C
 ports: the work-submit token (step 11 below, corrected). Every other `_GB10B`-named function cited here
 is one GB20B also takes, or is cited as GB10B's for contrast. Nothing in stage C has run on the chip.
+Two more differing HALs are called by driver code this stage mirrors; neither changes anything here:
+`kfifoValidateSCGTypeAndRunqueue` (GP102 for GB10B, GB202 for GB20B; kernel_fifo_gp102.c:45-62,
+kernel_fifo_gb202.c:239-256) refuses the same pair, a thread type of 1 with runqueue 0, under another
+constant name, and the flags of step 2.10 leave the thread type 0 and send runqueue 0; `memmgrIsKind` (TU102, GB20B) has the
+same body over each chip's kind table, and the PTE kind this module writes is 0, PITCH in both tables
+(turing/tu102/dev_mmu.h:98, blackwell/gb20b/dev_mmu.h; virt_mem_allocator_gm107.c:732).
 
 Status: IMPLEMENTED (kmod/aien_gpu_rm.c; om/rm.om, om/rmchan.om, om/rmctl.om, om/rmchk.om,
 om/rmarg.om; tools/aien-gpu-m16.c). Host-tested (tests/host/parity_rm.c, mutants). Hardware NOT_RUN.

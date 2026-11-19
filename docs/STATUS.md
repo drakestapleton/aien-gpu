@@ -44,8 +44,10 @@ GspSystemInfo (the one differing HAL feeding it, `kbifReadPcieCplCapsFromConfigS
 same PCIe DevCap2 atomic completer bits 7..9, measured clear on this Spark GPU in
 `build/oracle/evidence/own-gpu-driver/rung2/system_info.txt:63-64`, GPU DevCap2 `0x00670813`).
 
-Decimal constants in `om/boot.om`, `om/rmarg.om` and `tools/gb20b_gsp_boot.h`, each recomputed with
-`aien-calc eval` on spark-b87b 2026-11-19. The receipts are in `docs/calc-receipts/` (file name =
+The decimal forms of the register offsets, bit masks and sizes that `om/boot.om`, `om/rmarg.om` op 4 and
+`tools/gb20b_gsp_boot.h` take from NVIDIA's headers in hexadecimal, each recomputed with `aien-calc eval`
+on spark-b87b 2026-11-19 (small counts and bounds such as 4, 20, 127, 1024 and 4095 are written as they
+are in the source and have no receipt). The receipts are in `docs/calc-receipts/` (file name =
 receipt id; `aien-calc verify calc:<id>` recomputes one from its own inputs):
 
 | Expression | Value | Used as | Receipt (first 16 hex digits) |
@@ -76,6 +78,9 @@ receipt id; `aien-calc verify calc:<id>` recomputes one from its own inputs):
 | `0x34000` | 212992 | GspRmBoot_GB20B size | `34f2075f44dc3087` |
 | `0xf000` | 61440 | GspRmBoot_GB20B monitor code offset | `5d52fca0ae63d06b` |
 | `133 * 2^20` | 139460608 | GSP firmware heap size | `376b58881c83da9d` |
+| `2^13` | 8192 | HWCFG2 RISCV_BR_PRIV_LOCKDOWN (bit 13) | `495ae977dd37c9a5` |
+| `0xffff` | 65535 | 16-bit vendor id field | `57e7fe4d9a051797` |
+| `0xffffffff` | 4294967295 | 32-bit mask of the reply size and of the low address half | `9411575d6f2fb86e` |
 
 Hardware rules learned the same day: the chip must be cold (booted with nvidia held back) for our
 start-up; a sysfs PCIe FLR on 000f:01:00.0 resets the whole Spark (2026-11-18T23:15:09Z); the way back
