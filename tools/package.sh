@@ -3,7 +3,9 @@
 # package.sh ORACLE OUT -- build the GSP boot package aien-gpu-boot reads, for GB20B (the chip in the
 # DGX Spark: PMC_BOOT_42 0x1bba1000). Uses the extractors of the pinned aienux clone (ORACLE =
 # build/oracle, c9678d7b); they are chip-neutral. Reads NVIDIA's signed 580.173.02 files on this machine
-# (on loan, docs/BOUNDARY.md) and checks every piece against a pin below; writes only into OUT.
+# (on loan, docs/BOUNDARY.md) and checks every piece against a pin below: the firmware container and
+# its two sections, the boot loader with its descriptor, the FMC with hash, key and signature, and
+# the system information as text and as encoded. Writes only into OUT.
 # Touches no device. Exit 0 only on WINDOW1_PACKAGE: PASS.
 #
 # What makes the package GB20B (open-gpu-kernel-modules 580.173.02):
@@ -31,6 +33,9 @@ PIN_FMC_HASH=4a5854c785fa7a9ea4aaabb52f6c9838242f81506659ff413da0f4b8ac1f40bf
 PIN_FMC_PKEY=54076b108ad3da65e09f675d88efd553340a0c0653cf13372f4e30dd6ab17e7c
 PIN_FMC_SIG=6c5fbbf096efff9d0f47d4cc70096898f059579154464e6c3b972d2e606f1334
 # the boot loader's RM_RISCV_UCODE_DESC as ck_gsp_bindata_extract prints it (tools/gb20b_gsp_boot.h)
+# GspSystemInfo of this Spark (evidence/own-gpu-driver/rung2 of the oracle): the text and its encoding
+PIN_SYSINFO_TXT=fd384ca727b74c6c29feda3b7a8c20491099b1a2dac6966707d4264e5ae7086f
+PIN_SYSINFO_BIN=bd4b23c08ecf78e074132b58a6968ee52262d801e8092ed4e63cc12d8c82ee5d
 PIN_DESC='version=5 manifest=0x0+0xa00 monitor_data=0xa00+0xe600 monitor_code=0xf000+0x24d00 monitor_enabled=1 fb_reserved=0x0 signed_as_code=0 app_version=0 image=UCODE_IMAGE_PROD/212992'
 
 die() { echo "WINDOW1_PACKAGE: FAIL ($*)"; exit 1; }
@@ -96,9 +101,11 @@ app=$(printf '%s\n' "$desc" | sed -n 's/.* app_version=\([0-9]*\) .*/\1/p')
 echo "$app" > "$OUT/app_version.txt"
 echo "$CHIP" > "$OUT/chip.txt"
 
-# 3. GspSystemInfo
+# 3. GspSystemInfo: SYSINFO_TXT may name another copy of the text, not another text
+pinned "$SI_TXT" "$PIN_SYSINFO_TXT"
 "$TOOLS/ck_gsp_sysinfo_encode" encode "$SI_TXT" "$OUT/system_info.bin" > "$W/sysinfo.txt" ||
 	die "system info refused: $(tail -1 "$W/sysinfo.txt")"
+pinned "$OUT/system_info.bin" "$PIN_SYSINFO_BIN"
 
 # 4. manifest
 {

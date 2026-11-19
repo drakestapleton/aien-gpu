@@ -5,8 +5,8 @@
 
   Model-to-system link:
     - Repository: aien-gpu, branch fix/gb20b-sec2-reply. Written 2026-11-18 by the
-      antigravity-aien-gpu lane against head 39a2f15. This header was edited 2026-11-19; the
-      definitions and proofs below are unchanged.
+      antigravity-aien-gpu lane against head 39a2f15. This header and two comments were edited
+      2026-11-19; the definitions and proofs are unchanged.
     - The definitions were written by hand from:
         * om/boot.om: ememdw, the reply size in brsp, the checks in brspchk, the order of the steps
         * om/rmarg.om op 4 (GB20B work-submit token, gb202/dev_vm.h:27-32)
@@ -22,7 +22,7 @@ namespace AienGpuGb20b
 
 /-! ## 1. SEC2 MSGQ 32-bit wraparound size formula (om/boot.om:251-256, 226) -/
 
-def U32_MOD : Nat := 4294967296  -- 2^32 (Wolfram verified)
+def U32_MOD : Nat := 4294967296  -- 2^32 (docs/calc-receipts)
 
 /-- Exact model of om/boot.om:251: `sz = and sub add add obs 4294967296 4 get st 11 4294967295` -/
 def msgqSz (head tail : Nat) : Nat :=
@@ -112,7 +112,7 @@ theorem emem_roundtrip_aincr (dw : Nat) (hd : dw ≤ 256) :
 
 /-! ## 3. GB20B Work-Submit Doorbell Token (om/rmarg.om op 4, gb202/dev_vm.h:27-32) -/
 
-def DOORBELL_ENABLE : Nat := 1073741824  -- 2^30 (Wolfram verified)
+def DOORBELL_ENABLE : Nat := 1073741824  -- 2^30 (docs/calc-receipts)
 
 /-- Exact arithmetic form of GB20B token: bit 30 | (rl << 16) | ch -/
 def gb20bToken (rl ch : Nat) : Nat :=

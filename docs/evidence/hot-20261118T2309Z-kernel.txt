@@ -1,0 +1,110 @@
+# Kernel log of spark-b87b, boot 39641099e7094cb08e4dd7ad56406575 (journalctl -k -b -3 on 2026-11-19),
+# lines naming NVRM, nvidia or aien between 17:08 and 17:15 CST on 2026-11-18 (23:08 to 23:15 UTC):
+# the hot attempt (rmmod nvidia, aien_gpu.ko of 5112e27 with the GB10B start-up, then modprobe nvidia).
+Nov 18 17:08:58 spark-b87b kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Call not supported [NV_ERR_NOT_SUPPORTED] (0x00000056) returned from pRmApi->Control(pRmApi, nv->rmapi.hClient, nv->rmapi.hSubDevice, NV2080_CTRL_CMD_INTERNAL_DISPLAY_PRE_UNIX_CONSOLE, &preUnixConsoleParams, sizeof(preUnixConsoleParams)) @ unix_console.c:190
+Nov 18 17:09:00 spark-b87b kernel: [drm] [nvidia-drm] [GPU ID 0x000f0100] Unloading driver
+Nov 18 17:09:00 spark-b87b kernel: nvidia-modeset: Unloading
+Nov 18 17:09:00 spark-b87b kernel: nvidia-nvlink: Unregistered Nvlink Core, major device number 500
+Nov 18 17:09:00 spark-b87b kernel: aien_gpu: module verification failed: signature and/or required key missing - tainting kernel
+Nov 18 17:09:00 spark-b87b kernel: aien-gpu: omega self-test PASS units=7
+Nov 18 17:09:01 spark-b87b kernel: aien-gpu 000f:01:00.0: firmware nvidia/580.173.02/gsp_ga10x.bin 75012080 bytes sha256 32cb7cf3e77f97e92f6e92135939ccb3ba382748144569c0dfccf3338d43d963 matches the pin
+Nov 18 17:09:01 spark-b87b kernel: aien-gpu 000f:01:00.0: bound: BOOT_0 1bb000a1 BOOT_42 1bba1000 BAR0 67108864 bytes, arena 100663296 at 0x000000ffe8000000, heap 536870912 at 0x000000dcc0000000
+Nov 18 17:09:02 spark-b87b kernel: aien-gpu 000f:01:00.0: GSP was started: arena and heap kept until reboot
+Nov 18 17:09:02 spark-b87b kernel: nvidia-nvlink: Nvlink Core is being initialized, major device number 500
+Nov 18 17:09:02 spark-b87b kernel: nvidia 000f:01:00.0: vgaarb: VGA decodes changed: olddecodes=none,decodes=none:owns=none
+Nov 18 17:09:05 spark-b87b kernel: NVRM: loading NVIDIA UNIX Open Kernel Module for aarch64  580.173.02  Release Build  (dvs-builder@U22-A24-5-4)  Tue Jun 23 08:34:19 UTC 2026
+Nov 18 17:09:05 spark-b87b kernel: nvidia-modeset: Loading NVIDIA UNIX Open Kernel Mode Setting Driver for aarch64  580.173.02  Release Build  (dvs-builder@U22-A24-5-4)  Tue Jun 23 08:15:40 UTC 2026
+Nov 18 17:09:05 spark-b87b kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+Nov 18 17:09:05 spark-b87b kernel: NVRM: GspMsgQueuesInit: Allocation failed with big page size, retrying with default page size
+Nov 18 17:09:05 spark-b87b kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+Nov 18 17:09:07 spark-b87b kernel: NVRM: ksec2ProcessNvdmMessage_GB20B: Unknown or unsupported NVDM type received: 0x14
+Nov 18 17:09:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: Sent following content to SEC2: 
+Nov 18 17:09:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: version=0x2, size=0x35c, gspFmcSysmemOffset=0xdc57f40000
+Nov 18 17:09:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: frtsSysmemOffset=0x0, frtsSysmemSize=0x0
+Nov 18 17:09:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: frtsVidmemOffset=0x0, frtsVidmemSize=0x0
+Nov 18 17:09:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: gspBootArgsSysmemOffset=0xb9ff446000
+Nov 18 17:09:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: SEC2 boot cmds failed. RM cannot boot.
+Nov 18 17:09:07 spark-b87b kernel: NVRM: ksec2DumpDebugState_GB20B: GPU 000f:01:00
+Nov 18 17:09:07 spark-b87b kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Call not supported [NV_ERR_NOT_SUPPORTED] (0x00000056) returned from ksec2SendBootCommands_HAL(pGpu, pKernelSec2) @ kernel_gsp_gh100.c:871
+Nov 18 17:09:07 spark-b87b kernel: NVRM: gpuHandleSanityCheckRegReadError_GH100: Possible bad register read: addr: 0x110094,  regvalue: 0xbadf4100,  error code: Unknown SYS_PRI_ERROR_CODE
+Nov 18 17:09:07 spark-b87b kernel: NVRM: RmInitAdapter: Cannot initialize GSP firmware RM
+Nov 18 17:09:07 spark-b87b kernel: NVRM: GPU 000f:01:00.0: RmInitAdapter failed! (0x62:0x56:2028)
+Nov 18 17:09:07 spark-b87b kernel: NVRM: GPU 000f:01:00.0: rm_init_adapter failed, device minor number 0
+Nov 18 17:09:07 spark-b87b kernel: [drm] [nvidia-drm] [GPU ID 0x000f0100] Loading driver
+Nov 18 17:09:07 spark-b87b kernel: [drm] Initialized nvidia-drm 0.0.0 for 000f:01:00.0 on minor 0
+Nov 18 17:10:07 spark-b87b kernel: NVRM: _threadNodeCheckTimeout: _threadNodeCheckTimeout: currentTime: fa06c9ad19b40 >= fa06c9ad19b40
+Nov 18 17:10:07 spark-b87b kernel: NVRM: _threadNodeCheckTimeout: _threadNodeCheckTimeout: Timeout was set to: 4000 msecs!
+Nov 18 17:10:07 spark-b87b kernel: NVRM: ksec2PollForCanSend_IMPL: Timed out waiting for SEC2 command queue to be empty.
+Nov 18 17:10:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: Sent following content to SEC2: 
+Nov 18 17:10:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: version=0x2, size=0x35c, gspFmcSysmemOffset=0xdc57f40000
+Nov 18 17:10:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: frtsSysmemOffset=0x0, frtsSysmemSize=0x0
+Nov 18 17:10:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: frtsVidmemOffset=0x0, frtsVidmemSize=0x0
+Nov 18 17:10:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: gspBootArgsSysmemOffset=0xb9ff3eb000
+Nov 18 17:10:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: SEC2 boot cmds failed. RM cannot boot.
+Nov 18 17:10:07 spark-b87b kernel: NVRM: ksec2DumpDebugState_GB20B: GPU 000f:01:00
+Nov 18 17:10:07 spark-b87b kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Ran out of a critical resource, other than memory [NV_ERR_INSUFFICIENT_RESOURCES] (0x0000001A) returned from ksec2SendBootCommands_HAL(pGpu, pKernelSec2) @ kernel_gsp_gh100.c:871
+Nov 18 17:10:07 spark-b87b kernel: NVRM: gpuHandleSanityCheckRegReadError_GH100: Possible bad register read: addr: 0x110094,  regvalue: 0xbadf4100,  error code: Unknown SYS_PRI_ERROR_CODE
+Nov 18 17:10:07 spark-b87b kernel: NVRM: RmInitAdapter: Cannot initialize GSP firmware RM
+Nov 18 17:10:07 spark-b87b kernel: NVRM: GPU 000f:01:00.0: RmInitAdapter failed! (0x62:0x1a:2028)
+Nov 18 17:10:07 spark-b87b kernel: NVRM: GPU 000f:01:00.0: rm_init_adapter failed, device minor number 0
+Nov 18 17:11:07 spark-b87b kernel: NVRM: _threadNodeCheckTimeout: _threadNodeCheckTimeout: currentTime: fa07a99c5ef40 >= fa07a99c5ef40
+Nov 18 17:11:07 spark-b87b kernel: NVRM: _threadNodeCheckTimeout: _threadNodeCheckTimeout: Timeout was set to: 4000 msecs!
+Nov 18 17:11:07 spark-b87b kernel: NVRM: ksec2PollForCanSend_IMPL: Timed out waiting for SEC2 command queue to be empty.
+Nov 18 17:11:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: Sent following content to SEC2: 
+Nov 18 17:11:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: version=0x2, size=0x35c, gspFmcSysmemOffset=0xdc57f40000
+Nov 18 17:11:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: frtsSysmemOffset=0x0, frtsSysmemSize=0x0
+Nov 18 17:11:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: frtsVidmemOffset=0x0, frtsVidmemSize=0x0
+Nov 18 17:11:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: gspBootArgsSysmemOffset=0xb9ff473000
+Nov 18 17:11:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: SEC2 boot cmds failed. RM cannot boot.
+Nov 18 17:11:07 spark-b87b kernel: NVRM: ksec2DumpDebugState_GB20B: GPU 000f:01:00
+Nov 18 17:11:07 spark-b87b kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Ran out of a critical resource, other than memory [NV_ERR_INSUFFICIENT_RESOURCES] (0x0000001A) returned from ksec2SendBootCommands_HAL(pGpu, pKernelSec2) @ kernel_gsp_gh100.c:871
+Nov 18 17:11:07 spark-b87b kernel: NVRM: gpuHandleSanityCheckRegReadError_GH100: Possible bad register read: addr: 0x110094,  regvalue: 0xbadf4100,  error code: Unknown SYS_PRI_ERROR_CODE
+Nov 18 17:11:07 spark-b87b kernel: NVRM: RmInitAdapter: Cannot initialize GSP firmware RM
+Nov 18 17:11:07 spark-b87b kernel: NVRM: GPU 000f:01:00.0: RmInitAdapter failed! (0x62:0x1a:2028)
+Nov 18 17:11:07 spark-b87b kernel: NVRM: GPU 000f:01:00.0: rm_init_adapter failed, device minor number 0
+Nov 18 17:12:07 spark-b87b kernel: NVRM: _threadNodeCheckTimeout: _threadNodeCheckTimeout: currentTime: fa0889a46fdc0 >= fa0889a46fdc0
+Nov 18 17:12:07 spark-b87b kernel: NVRM: _threadNodeCheckTimeout: _threadNodeCheckTimeout: Timeout was set to: 4000 msecs!
+Nov 18 17:12:07 spark-b87b kernel: NVRM: ksec2PollForCanSend_IMPL: Timed out waiting for SEC2 command queue to be empty.
+Nov 18 17:12:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: Sent following content to SEC2: 
+Nov 18 17:12:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: version=0x2, size=0x35c, gspFmcSysmemOffset=0xdc57f40000
+Nov 18 17:12:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: frtsSysmemOffset=0x0, frtsSysmemSize=0x0
+Nov 18 17:12:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: frtsVidmemOffset=0x0, frtsVidmemSize=0x0
+Nov 18 17:12:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: gspBootArgsSysmemOffset=0xb9ff477000
+Nov 18 17:12:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: SEC2 boot cmds failed. RM cannot boot.
+Nov 18 17:12:07 spark-b87b kernel: NVRM: ksec2DumpDebugState_GB20B: GPU 000f:01:00
+Nov 18 17:12:07 spark-b87b kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Ran out of a critical resource, other than memory [NV_ERR_INSUFFICIENT_RESOURCES] (0x0000001A) returned from ksec2SendBootCommands_HAL(pGpu, pKernelSec2) @ kernel_gsp_gh100.c:871
+Nov 18 17:12:07 spark-b87b kernel: NVRM: gpuHandleSanityCheckRegReadError_GH100: Possible bad register read: addr: 0x110094,  regvalue: 0xbadf4100,  error code: Unknown SYS_PRI_ERROR_CODE
+Nov 18 17:12:07 spark-b87b kernel: NVRM: RmInitAdapter: Cannot initialize GSP firmware RM
+Nov 18 17:12:07 spark-b87b kernel: NVRM: GPU 000f:01:00.0: RmInitAdapter failed! (0x62:0x1a:2028)
+Nov 18 17:12:07 spark-b87b kernel: NVRM: GPU 000f:01:00.0: rm_init_adapter failed, device minor number 0
+Nov 18 17:13:07 spark-b87b kernel: NVRM: _threadNodeCheckTimeout: _threadNodeCheckTimeout: currentTime: fa0969be9f700 >= fa0969be9f700
+Nov 18 17:13:07 spark-b87b kernel: NVRM: _threadNodeCheckTimeout: _threadNodeCheckTimeout: Timeout was set to: 4000 msecs!
+Nov 18 17:13:07 spark-b87b kernel: NVRM: ksec2PollForCanSend_IMPL: Timed out waiting for SEC2 command queue to be empty.
+Nov 18 17:13:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: Sent following content to SEC2: 
+Nov 18 17:13:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: version=0x2, size=0x35c, gspFmcSysmemOffset=0xdc57f40000
+Nov 18 17:13:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: frtsSysmemOffset=0x0, frtsSysmemSize=0x0
+Nov 18 17:13:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: frtsVidmemOffset=0x0, frtsVidmemSize=0x0
+Nov 18 17:13:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: gspBootArgsSysmemOffset=0xb9ff4f2000
+Nov 18 17:13:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: SEC2 boot cmds failed. RM cannot boot.
+Nov 18 17:13:07 spark-b87b kernel: NVRM: ksec2DumpDebugState_GB20B: GPU 000f:01:00
+Nov 18 17:13:07 spark-b87b kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Ran out of a critical resource, other than memory [NV_ERR_INSUFFICIENT_RESOURCES] (0x0000001A) returned from ksec2SendBootCommands_HAL(pGpu, pKernelSec2) @ kernel_gsp_gh100.c:871
+Nov 18 17:13:07 spark-b87b kernel: NVRM: gpuHandleSanityCheckRegReadError_GH100: Possible bad register read: addr: 0x110094,  regvalue: 0xbadf4100,  error code: Unknown SYS_PRI_ERROR_CODE
+Nov 18 17:13:07 spark-b87b kernel: NVRM: RmInitAdapter: Cannot initialize GSP firmware RM
+Nov 18 17:13:07 spark-b87b kernel: NVRM: GPU 000f:01:00.0: RmInitAdapter failed! (0x62:0x1a:2028)
+Nov 18 17:13:07 spark-b87b kernel: NVRM: GPU 000f:01:00.0: rm_init_adapter failed, device minor number 0
+Nov 18 17:14:07 spark-b87b kernel: NVRM: _threadNodeCheckTimeout: _threadNodeCheckTimeout: currentTime: fa0a49aed8d40 >= fa0a49aed8d40
+Nov 18 17:14:07 spark-b87b kernel: NVRM: _threadNodeCheckTimeout: _threadNodeCheckTimeout: Timeout was set to: 4000 msecs!
+Nov 18 17:14:07 spark-b87b kernel: NVRM: ksec2PollForCanSend_IMPL: Timed out waiting for SEC2 command queue to be empty.
+Nov 18 17:14:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: Sent following content to SEC2: 
+Nov 18 17:14:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: version=0x2, size=0x35c, gspFmcSysmemOffset=0xdc57f40000
+Nov 18 17:14:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: frtsSysmemOffset=0x0, frtsSysmemSize=0x0
+Nov 18 17:14:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: frtsVidmemOffset=0x0, frtsVidmemSize=0x0
+Nov 18 17:14:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: gspBootArgsSysmemOffset=0xb9ff4f6000
+Nov 18 17:14:07 spark-b87b kernel: NVRM: ksec2SendBootCommands_GB20B: SEC2 boot cmds failed. RM cannot boot.
+Nov 18 17:14:07 spark-b87b kernel: NVRM: ksec2DumpDebugState_GB20B: GPU 000f:01:00
+Nov 18 17:14:07 spark-b87b kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Ran out of a critical resource, other than memory [NV_ERR_INSUFFICIENT_RESOURCES] (0x0000001A) returned from ksec2SendBootCommands_HAL(pGpu, pKernelSec2) @ kernel_gsp_gh100.c:871
+Nov 18 17:14:07 spark-b87b kernel: NVRM: gpuHandleSanityCheckRegReadError_GH100: Possible bad register read: addr: 0x110094,  regvalue: 0xbadf4100,  error code: Unknown SYS_PRI_ERROR_CODE
+Nov 18 17:14:07 spark-b87b kernel: NVRM: RmInitAdapter: Cannot initialize GSP firmware RM
+Nov 18 17:14:07 spark-b87b kernel: NVRM: GPU 000f:01:00.0: RmInitAdapter failed! (0x62:0x1a:2028)
+Nov 18 17:14:07 spark-b87b kernel: NVRM: GPU 000f:01:00.0: rm_init_adapter failed, device minor number 0
+Nov 18 17:14:08 spark-b87b kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359

@@ -23,6 +23,12 @@ T=$(mktemp -d /tmp/agpu-plan.XXXXXX)
 trap 'rm -rf "$T"' EXIT
 OGKM_DIR=$OGKM sh "$ROOT/tools/package.sh" "$ORACLE" "$T/pkg" > "$T/pkg.log" 2>&1 || {
 	tail -5 "$T/pkg.log"; echo "PLAN-TEST FAIL package"; exit 1; }
+# control: a changed system information text must be refused by its pin, before anything is encoded
+{ cat "$ORACLE/evidence/own-gpu-driver/rung2/system_info.txt"; echo "# changed"; } > "$T/si.txt"
+if SYSINFO_TXT="$T/si.txt" OGKM_DIR=$OGKM sh "$ROOT/tools/package.sh" "$ORACLE" "$T/pkg2" > "$T/pkg2.log" 2>&1 ||
+	! grep -q 'si.txt does not match its pin' "$T/pkg2.log" || [ -e "$T/pkg2/system_info.bin" ]; then
+	tail -3 "$T/pkg2.log"; echo "PLAN-TEST FAIL control: a changed system information text was not refused"; exit 1
+fi
 "$B/aien-gpu-boot" --plan-only --pkg "$T/pkg" --out "$T/out" > "$T/run.log" 2>&1
 rc=$?
 line=$(grep '^AIEN_GPU_BOOT:' "$T/run.log")
@@ -60,4 +66,4 @@ for c in bootloader.bin:196608 fmc.bin:195912; do
 		cat "$T/bad.log"; echo "PLAN-TEST FAIL control $f of $n bytes not refused ($brc)"; exit 1
 	fi
 done
-echo "PLAN-TEST PASS ${line#AIEN_GPU_BOOT: }; $cot; controls: poll budget 0 refused by om/abi.om (code 6), GB10B-sized boot loader and FMC refused"
+echo "PLAN-TEST PASS ${line#AIEN_GPU_BOOT: }; $cot; controls: poll budget 0 refused by om/abi.om (code 6), GB10B-sized boot loader and FMC refused, changed system information refused"

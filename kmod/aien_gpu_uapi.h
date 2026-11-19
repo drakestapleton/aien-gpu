@@ -104,8 +104,7 @@ struct agpu_boot {
 
 /*
  * AGPU_ARENA_READ: copy a range of the boot arena out (root; evidence such as GSP's log buffers
- * after
- * the start-up, when the arena is no longer mappable). om/abi.om request 2 checks off/len.
+ * after the start-up, when the arena is no longer mappable). om/abi.om request 2 checks off/len.
  */
 struct agpu_arena_read {
 	__u64 off, len;		/* len 1..16 MiB, inside the arena */

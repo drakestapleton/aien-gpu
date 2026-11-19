@@ -68,6 +68,7 @@ boot|parity_boot|if ne ememdw get st 10 div sz 4|if ne ememdw get st 10 ememdw g
 boot|parity_boot|if ne and d1 127 126|if ne and d1 126 126
 boot|parity_boot|if ne and shr d1 8 65535 4318|if ne and shr d1 16 255 16
 boot|parity_boot|if or ne som 1 ne eom 1|if ne som 1
+boot|parity_boot|if eq som 1|if ge som 0
 boot|parity_boot|if and ne t 21 ne t 24|if and ne t 21 ne t 20
 boot|parity_boot|if lt sz 20|if lt sz 16
 boot|parity_boot|if lt sz 20|if lt sz 19

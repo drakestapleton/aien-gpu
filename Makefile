@@ -84,9 +84,17 @@ $(B)/parity_gmmu: tests/host/parity_gmmu.c $(B)/agpu_om.o $(ORACLE)/.rev
 # NVIDIA 580.173.02 structs (MIT SDK headers, NVSRC) and the framing against the aienux oracle.
 NVSRC ?= $(HOME)/workspace/_ext/open-gpu-kernel-modules-580.173.02/src
 NVSDK := -I $(NVSRC)/common/sdk/nvidia/inc -I $(NVSRC)/common/sdk/nvidia/inc/ctrl -I $(NVSRC)/common/inc
-$(B)/parity_rm: tests/host/parity_rm.c $(B)/agpu_om.o $(ORACLE)/.rev
-	@test -f $(NVSRC)/common/sdk/nvidia/inc/alloc/alloc_channel.h || \
-		{ echo "NVSRC=$(NVSRC): open-gpu-kernel-modules 580.173.02 src/ not found"; exit 1; }
+# NVSRC is outside this repository. The files of it that the gates read (the 56 headers parity_rm.c
+# opens and the two GB20B bindata sources of tools/package.sh) are pinned as one hash; see
+# tools/nvsrc-pin.sh. To re-pin after reading a new tree: make nvsrc-print.
+NVSRC_SHA256 := f0ba856741886e14e2bd0bab4a0db46937423e9af895ef08e96d73bc84c00389
+NVSRC_DEPS = $(CC) $(HOSTCFLAGS) $(OCFLAGS) $(NVSDK) -M tests/host/parity_rm.c
+$(B)/nvsrc.ok: tools/nvsrc-pin.sh tests/host/parity_rm.c Makefile $(ORACLE)/.rev | $(B)
+	@sh tools/nvsrc-pin.sh "$(NVSRC)" $(NVSRC_SHA256) $(NVSRC_DEPS) > $@.tmp || { cat $@.tmp; rm -f $@.tmp; exit 1; }
+	@cat $@.tmp; mv $@.tmp $@
+nvsrc-print: $(ORACLE)/.rev
+	sh tools/nvsrc-pin.sh "$(NVSRC)" print $(NVSRC_DEPS)
+$(B)/parity_rm: tests/host/parity_rm.c $(B)/agpu_om.o $(ORACLE)/.rev $(B)/nvsrc.ok
 	$(CC) $(HOSTCFLAGS) $(OCFLAGS) $(NVSDK) -o $@ $< $(ODEV)/gb10_gsp_boot.c $(B)/agpu_om.o
 
 $(B)/unit_test: tests/host/unit_test.c $(B)/agpu_om.o
@@ -113,10 +121,15 @@ TOOLS := aien-gpu-boot aien-gpu-m16
 tools: $(TOOLS:%=$(B)/%)
 
 HOST_TESTS := unit_test parity_boot test_gb20b_builder parity_seq parity_mq parity_gmmu parity_rm
-host-test: $(HOST_TESTS:%=$(B)/%) tools $(B)/cot_boot
+# units whose comparisons get generated off-by-one mutants (tests/host/boundary.sh), with their test
+BOUNDARY := boot parity_boot ident unit_test
+host-test: $(HOST_TESTS:%=$(B)/%) tools $(B)/cot_boot $(B)/nvsrc.ok
 	@set -e; for t in $(HOST_TESTS); do ./$(B)/$$t; done
 	sh tests/host/kcheck_controls.sh $(B)/kcheck
 	sh tests/host/mutants.sh $(OMC) $(B)
+	sh tests/host/boundary.sh $(OMC) $(B) $(BOUNDARY)
+	sh tools/claims-lint.sh
+	sh tools/claims-lint.sh --selftest
 	sh tests/host/plan_test.sh $(ORACLE) $(B)
 
 kmod: om

@@ -1,9 +1,12 @@
 # The hardware window for aien-gpu.ko
 
 Status: **`run.sh go` is DISABLED (2026-11-18).** This procedure unloads NVIDIA's driver and loads
-ours on the same boot. That was done on the chip on 2026-11-18 and cannot work: after `rmmod nvidia`
-the GSP is left suspended and our start-up cannot begin, and after our attempt nvidia.ko cannot
-re-initialise the chip, so the machine has to restart. The chip must be cold: booted with nvidia held
+ours on the same boot. That was tried once on the chip (2026-11-18T23:09Z, with the GB10B start-up):
+our start-up stopped with the suspended marker 0x80000000 in the GSP's MAILBOX0, and afterwards
+nvidia.ko did not re-initialise the chip (`ksec2SendBootCommands_GB20B: SEC2 boot cmds failed`,
+then `Timed out waiting for SEC2 command queue to be empty`), so the machine had to restart
+(`docs/evidence/hot-20261118T2309Z-kernel.txt`). One run does not show that a hot start can never
+work; it is not tried again here. The chip must be cold: booted with nvidia held
 back, our module loaded first, and a clean restart as the way back to nvidia.ko. A sysfs PCIe FLR on
 000f:01:00.0 is not a way back: it reset the whole Spark (2026-11-18T23:15:09Z). `run.sh check` still
 works and changes nothing. The cold-boot procedure is not written in this repository yet; the one

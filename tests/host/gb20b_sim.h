@@ -28,6 +28,8 @@ struct g2sim_cfg {
 	uint32_t rsp_dw[5];
 	uint32_t rsp_head;          /* MSGQ_HEAD value SEC2 posts (SIM-CHOICE: 0) */
 	uint32_t rsp_no_inc;        /* hardware fault: EMEMC does not advance on read */
+	uint32_t rsp_withdrawn;     /* SIM-CHOICE: the first MSGQ_TAIL read after the reply is posted shows it,
+				     * every later one reads back equal to HEAD (size 4 at the second look) */
 	uint32_t mask_reads;        /* HWCFG2 reads that return 0xBADF41A7 after the reply is acknowledged */
 	uint32_t args_reads;        /* GSP MAILBOX0 reads that still return the boot-argument address */
 	uint32_t lockdown_reads;    /* HWCFG2 reads with lockdown set after the target mask is released */
@@ -51,7 +53,7 @@ struct g2sim {
 	uint32_t gsp_mb0, gsp_mb1, hwcfg2, os, cpuctl, gsp_qhead_writes;
 	/* phase: 0 idle, 1 command posted, 5 reply posted, 6 tail acknowledged, 2 mask, 3 FMC running,
 	 * 4 released, 9 rejected */
-	uint32_t phase, left, zero_left;
+	uint32_t phase, left, zero_left, tail_reads;
 	uint32_t packet_ok, reply_ok, os_written_at_phase;
 	struct g2sim_ev log[G2SIM_LOG_MAX];
 	uint32_t nlog, violations;

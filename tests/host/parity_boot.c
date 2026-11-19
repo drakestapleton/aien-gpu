@@ -34,9 +34,12 @@ struct res {
 	unsigned pauses;
 };
 
-static void run_c(const struct g2sim_cfg *cfg, uint32_t len, uint32_t budget, struct res *r)
+/* the boot-argument address the driver is given; a scenario may change it */
+static uint64_t drv_pa = ARGS_PA;
+
+static void run_c(const struct g2sim_cfg *cfg, uint32_t len, const uint32_t *b, struct res *r)
 {
-	struct g2_in in = { pkt, len, ARGS_PA, APP_VERSION, budget, budget, budget, budget, count_pause, 0 };
+	struct g2_in in = { pkt, len, drv_pa, APP_VERSION, b[0], b[1], b[2], b[3], count_pause, 0 };
 	struct g2_out o;
 	struct ck_gpu_regs regs;
 
@@ -67,7 +70,7 @@ static void run_c(const struct g2sim_cfg *cfg, uint32_t len, uint32_t budget, st
 }
 
 /* The module's executor, as kmod/aien_gpu_boot.c runs it, over the simulator instead of BAR0. */
-static int run_om(const struct g2sim_cfg *cfg, uint32_t len, uint32_t budget, struct res *r)
+static int run_om(const struct g2sim_cfg *cfg, uint32_t len, const uint32_t *b, struct res *r)
 {
 	uint64_t st[32] = { 0 }, act[4], obs = 0, status;
 	struct ck_gpu_regs regs;
@@ -79,9 +82,10 @@ static int run_om(const struct g2sim_cfg *cfg, uint32_t len, uint32_t budget, st
 	for (int i = 8; i < 32; i++)
 		st[i] = 0xdeadbeefcafebabeULL;
 	st[1] = len;
-	st[2] = ARGS_PA;
+	st[2] = drv_pa;
 	st[3] = APP_VERSION;
-	st[4] = st[5] = st[6] = st[7] = budget;
+	for (int i = 0; i < 4; i++)
+		st[4 + i] = b[i];
 	memset(r, 0, sizeof(*r));
 	for (;;) {
 		uint64_t v = om_call(agpu_om_boot, P(st), P(pkt), obs, P(act), 0, 0, &status);
@@ -154,7 +158,9 @@ static int same(const char *name)
 }
 
 /* One fault per scenario kind; kind 0 is the clean start-up. */
-#define KINDS 38u
+#define KINDS 44u
+#define KIND_PA_LOW_ZERO 42u
+#define KIND_PA_ODD 43u
 static void fault(unsigned kind, struct g2sim_cfg *c)
 {
 	switch (kind) {
@@ -195,6 +201,12 @@ static void fault(unsigned kind, struct g2sim_cfg *c)
 	case 35: c->rsp_bytes = 3; break;                             /* below 4: refused before EMEM read/ack */
 	case 36: c->rsp_bytes = 5; break;                             /* smallest tail!=head size >= 4: 1 dword */
 	case 37: c->rsp_bytes = 19; break;                            /* 1 byte below 20: too short for response */
+	case 38: c->rsp_bytes = 1025; break;                          /* one byte over the channel: refused */
+	case 39: /* not a first packet, with a header that would be refused in one: not looked at */
+		c->rsp_set = 3; c->rsp_dw[0] = 0x40000000u; c->rsp_dw[1] = 0x1510DE7Fu; break;
+	case 40: c->rsp_head = 0x100; c->rsp_bytes = 0xffffff04u; break; /* tail 0 below a non-zero head */
+	case 41: c->rsp_withdrawn = 1; break;                         /* size 4 at the second look: one dword */
+	/* 42, 43: the boot-argument address itself, set in main() */
 	default: break;
 	}
 }
@@ -202,7 +214,12 @@ static void fault(unsigned kind, struct g2sim_cfg *c)
 int main(void)
 {
 	static const uint32_t lens[] = { 0, 1, 3, 4, 5, 7, 8, 868, 1023, 1024, 1025 };
-	static const uint32_t budgets[] = { 0, 1, 3, 100 };
+	/* poll budgets of the four waits (send, reply, mask, lockdown): four equal sets, then one wait
+	 * at a time short of what the scenario needs while the others have room, so that a wait which
+	 * read another wait's budget is seen */
+	static const uint32_t budgets[][4] = { { 0, 0, 0, 0 }, { 1, 1, 1, 1 }, { 3, 3, 3, 3 }, { 100, 100, 100, 100 },
+					       { 1, 100, 100, 100 }, { 100, 2, 100, 100 }, { 100, 100, 2, 100 },
+					       { 100, 100, 100, 2 } };
 	unsigned n = 0, clean = 0;
 	unsigned seen[G2_STAGES] = { 0 }, why[G2_WHYS] = { 0 };
 
@@ -232,7 +249,15 @@ int main(void)
 				c.lockdown_reads = 5;
 				c.fmc_args_pa = ARGS_PA;
 				fault(sc % KINDS, &c);
-				snprintf(name, sizeof(name), "scenario %u len %u budget %u", sc, lens[li], budgets[bi]);
+				/* MAILBOX0 == 0 must not read as "the address, not read yet" when the address's low
+				 * half is 0; an odd address must compare in full (the driver compares all 32 bits) */
+				drv_pa = ARGS_PA;
+				if (sc % KINDS == KIND_PA_LOW_ZERO)
+					c.fmc_args_pa = drv_pa = 0x0000000700000000ull;
+				if (sc % KINDS == KIND_PA_ODD)
+					c.fmc_args_pa = drv_pa = ARGS_PA | 1u;
+				snprintf(name, sizeof(name), "scenario %u len %u budgets %u,%u,%u,%u", sc, lens[li],
+					 budgets[bi][0], budgets[bi][1], budgets[bi][2], budgets[bi][3]);
 				run_c(&c, lens[li], budgets[bi], &rc);
 				if (run_om(&c, lens[li], budgets[bi], &ro))
 					return 1;
@@ -273,16 +298,17 @@ int main(void)
 	 * model with an error reply, and the start-up must stop at "SEC2 reported an error". */
 	{
 		static const uint32_t hdr1[3] = { 0xC0000000u, 0x1410DE7Eu, 1u | (860u << 16) };
+		static const uint32_t b100[4] = { 100, 100, 100, 100 };
 		struct g2sim_cfg c;
 		struct res rc, ro;
 
 		memset(&c, 0, sizeof(c));
-		c.fmc_args_pa = ARGS_PA;
+		c.fmc_args_pa = drv_pa = ARGS_PA;
 		memset(pkt, 0, sizeof(pkt));
 		memcpy(pkt, hdr1, sizeof(hdr1));
 		pkt[28] = 0x48; pkt[29] = 0xfd; pkt[30] = 0x02; /* 195912, the GB10B FMC size */
-		run_c(&c, 868, 100, &rc);
-		if (run_om(&c, 868, 100, &ro) || !same("gb10b packet") || memcmp(&rc, &ro, sizeof(rc)))
+		run_c(&c, 868, b100, &rc);
+		if (run_om(&c, 868, b100, &ro) || !same("gb10b packet") || memcmp(&rc, &ro, sizeof(rc)))
 			return 1;
 		if (rc.stage != G2_E_SEC2ERR || rc.rsp_err != 0xA1u) {
 			printf("PARITY-BOOT FAIL gb10b packet: stage %u err %#x, want 11 and 0xa1\n", rc.stage, rc.rsp_err);

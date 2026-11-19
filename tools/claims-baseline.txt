@@ -1,0 +1,18 @@
+# Lines written before tools/claims-lint.sh existed (2026-11-19). Tolerated, not correct: REVIEW-LESSONS.md, Known debt.
+# FILE|LINE TEXT: a line that credits Wolfram with a constant and keeps no result.
+om/memchk.om|note Constants (Wolfram): 64 GiB = 2^36 = 68719476736, 2^48 = 281474976710656, 4 GiB = 4294967296,
+om/rmchan.om|note Decimal constants (Wolfram):
+om/rmctl.om|note a[50] placed; 1000000 + code). Ops 11..17 below. Hex constants written in decimal (Wolfram):
+om/rmctl.om|note (A first draft had 2416967942 for 0x90f10106; the Wolfram conversion caught it.)
+om/gmmu.om|note   and ALL_VA 0, ALL_PDB 0, scope ALL_TLBS 0 = 2147483649 (0x80000001, Wolfram FromDigits).
+om/gmmu.om|note Constants (decimal, from Wolfram): 2^57 = 144115188075855872, 2^52 = 4503599627370496,
+om/rpdes.om|note Constants (Wolfram): 2 MiB = 2097152, 4 GiB = 4294967296, 4.5 GiB - 1 = 4831838207 (0x11FFFFFFF),
+om/rm.om|note Hex constants written in decimal (each converted with Wolfram, docs/STAGE-C.md section 6):
+tools/kcheck.om|note 0x13000000/0x1f800000. Decimals from Wolfram FromDigits (2026-10-26).
+tools/aien-gpu-m16.c|	/* 0x224000001000: computed with Wolfram (BitOr of 0x4000001000, 8 << 42, 1 << 41) */
+tests/host/parity_gmmu.c|	/* hand vectors (dev_mmu.h fields; decimal values from Wolfram) */
+# PATH|DOCUMENT|PATH: a quoted path that is a file of another repository (aienux, CUDApp, omega-mv), as the document says.
+PATH|docs/AUDIT.md|docs/GPU_DRIVER.md
+PATH|docs/AUDIT.md|docs/GB10_FIRMWARE_INVENTORY.md
+PATH|docs/DESIGN.md|docs/DRIVER.md
+PATH|docs/DESIGN.md|docs/osc/OSC-1-DESIGN.md

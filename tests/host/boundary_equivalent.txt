@@ -1,0 +1,6 @@
+# Off-by-one mutants of tests/host/boundary.sh that no test can see, each with the reason.
+# UNIT|N|TOKEN|DELTA|LINE|REASON   (see the header of tests/host/boundary.sh)
+boot|1|4|-1|if lt sz 8|never taken, like the driver's own check (kernel_sec2_gb20b.c:329-333): under 8 bytes only dword 0 is read, st 29 is 0 and the message-type check refuses first; noted next to the line in om/boot.om
+boot|1|4|+1|if lt sz 8|never taken, like the driver's own check (kernel_sec2_gb20b.c:329-333): under 8 bytes only dword 0 is read, st 29 is 0 and the message-type check refuses first; noted next to the line in om/boot.om
+boot|1|6|-1|while eq r 2 bound 8|a safety bound that is never met: no scenario needs more than 2 rounds (measured 2026-11-19: bound 1 traps with code 4, bounds 2 to 7 pass); running past it is an Omega trap, not a wrong result
+boot|1|6|+1|while eq r 2 bound 8|a safety bound that is never met: no scenario needs more than 2 rounds (measured 2026-11-19: bound 1 traps with code 4, bounds 2 to 7 pass); running past it is an Omega trap, not a wrong result

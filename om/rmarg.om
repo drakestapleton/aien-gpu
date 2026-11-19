@@ -23,8 +23,8 @@ note op 5 unload: a0 = GSP falcon MAILBOX0 (BAR0 0x110040). Result 1 when it is 
 note   (LIBOS_INTERRUPT_PROCESSOR_SUSPENDED, _kgspIsProcessorSuspended, kernel_gsp_tu102.c:1226-1240), else 0.
 note op 6 halt: a0 = RISC-V CPUCTL (BAR0 0x111388). Result 1 when HALTED (4:4, gh100/dev_riscv_pri.h:62)
 note   is set, else 0 (kgspTeardown_GH100, kernel_gsp_gh100.c:995-1004).
-note Decimal constants (Wolfram): 281474976710656 = 2^48, 4294967295 = 0xffffffff,
-note 2147483648 = 0x80000000.
+note Decimal constants (aien-calc receipts in docs/calc-receipts, listed in docs/STATUS.md):
+note 281474976710656 = 2^48, 4294967295 = 0xffffffff, 2147483648 = 0x80000000, 1073741824 = 2^30.
 fn bit bm edit ulong 64 c ulong to bool
 ret ne and get bm div c 64 shl ulong 1 rem c 64 0
 end

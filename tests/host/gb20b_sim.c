@@ -129,7 +129,11 @@ static uint32_t sim_rd(void *ctx, uint32_t off)
 		}
 		v = s->mhead;
 		break;
-	case G2_SEC2_MSGQ_TAIL0: v = s->mtail; break;
+	case G2_SEC2_MSGQ_TAIL0:
+		v = s->mtail;
+		if (s->cfg.rsp_withdrawn && s->phase == PHASE_REPLIED && s->tail_reads++ >= 1)
+			v = s->mhead;
+		break;
 	case G2_GSP_HWCFG2:
 		if (s->phase == PHASE_MASK && s->zero_left) {
 			if (s->zero_left != G2SIM_NO_END)
@@ -155,8 +159,8 @@ static uint32_t sim_rd(void *ctx, uint32_t off)
 				} else {
 					s->hwcfg2 &= ~G2_HWCFG2_LOCKDOWN;
 					s->phase = PHASE_UP;
-					if (!s->cfg.riscv_dead)
-						s->cpuctl = G2_CPUCTL_ACTIVE;
+					/* dead: every low bit but ACTIVE, so a wrong mask bit shows */
+					s->cpuctl = s->cfg.riscv_dead ? G2_CPUCTL_ACTIVE - 1u : G2_CPUCTL_ACTIVE;
 				}
 			} else if (s->left != G2SIM_NO_END) {
 				s->left--;

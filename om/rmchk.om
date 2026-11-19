@@ -35,7 +35,7 @@ note   + 4; refusal 11 unless 1..64. Out a0.
 note op 9 GPU_GET_CLASSLIST_V2 reply {numClasses, classList[200]}: refusal 6 numClasses > 200, 12 no
 note   known compute or GPFIFO class. Out a0 compute class (0xcec0 BLACKWELL_COMPUTE_B, else 0xcdc0
 note   BLACKWELL_COMPUTE_A), a1 GPFIFO class (0xca6f BLACKWELL_CHANNEL_GPFIFO_B, else 0xc96f _A).
-note Decimal constants (Wolfram): 52928 = 0xcec0, 52672 = 0xcdc0, 51823 = 0xca6f, 51567 = 0xc96f,
+note Decimal constants (aien-calc receipts in docs/calc-receipts, listed in docs/STATUS.md): 52928 = 0xcec0, 52672 = 0xcdc0, 51823 = 0xca6f, 51567 = 0xc96f,
 note 67108864 = 64 MiB, 16777216 = 16 MiB, 2097152 = 2 MiB.
 fn r32 m view uchar 65536 o ulong to ulong
 x = or ulong get m o shl ulong get m add o 1 8
