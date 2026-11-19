@@ -80,6 +80,13 @@ if [ "$MODE" = check ]; then
 	echo "WINDOW-CHECK FAIL"; exit 1
 fi
 [ "$MODE" = go ] || die "mode must be check or go"
+# Measured 2026-11-18 (docs/STATUS.md): after `rmmod nvidia` the GSP is left suspended (MAILBOX0
+# 0x80000000) and our start-up cannot begin; after our attempt nvidia.ko cannot re-initialise the chip
+# either (SEC2 command queue never empties) and only a restart brings it back. The steps below unload
+# nvidia and load ours on the same boot, so they are refused until this script is rewritten around a
+# cold boot (nvidia held back at boot, clean restart as the way back). Never a sysfs PCIe FLR: on this
+# machine it resets the whole Spark.
+die "go is disabled: this script hot-swaps nvidia.ko for aien_gpu.ko, which cannot start the GSP on this chip (docs/STATUS.md, 2026-11-18). The chip must be cold."
 [ -n "$AUTH" ] || die "--authorized is required: Drake's explicit authorization for this window"
 [ -n "${SPARK_WINDOW:-}" ] && [ "${AIEN_GB10_LOCK_HELD:-}" = 1 ] || die "run inside: spark-window open l332-aien-gpu --ledger L332 --gb10 exclusive --quiet none --lease 20 --wait; spark-window run window/run.sh go ..."
 [ -x "$CUDAPP_M16" ] || die "--cudapp-m16 PATH: the CUDA++ m16 gate for the NVIDIA path must be ready before NVIDIA is unloaded"

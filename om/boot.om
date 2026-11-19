@@ -188,6 +188,8 @@ ret bact act 3 0 0
 end
 note Step 6, the check after the acknowledgement, in the driver's order: read pointer, packet state
 note with the header checks of a first packet, one packet only, NVDM type, length, error code.
+note The `lt sz 8` check is the driver's (kernel_sec2_gb20b.c:329-333) and is never taken here: under
+note 8 bytes only dword 0 was read, st 29 is 0 and the message-type check has already refused.
 fn brspchk st edit ulong 32 to ulong
 sz = get st 20
 if ne ememdw get st 10 div sz 4

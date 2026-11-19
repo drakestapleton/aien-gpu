@@ -63,7 +63,7 @@ static int run(const uint8_t *pkt, uint32_t len, uint32_t *stage, uint32_t *err)
 int main(int argc, char **argv)
 {
 	static uint8_t pkt[1024], bad[1024];
-	uint32_t stage, err;
+	uint32_t stage = ~0u, err = ~0u;
 	size_t n;
 	FILE *f;
 

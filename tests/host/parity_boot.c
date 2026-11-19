@@ -203,8 +203,8 @@ int main(void)
 	for (unsigned sc = 0; sc < 2 * KINDS; sc++) {
 		/* kinds 0..KINDS-1 with a pattern packet that SEC2 refuses, then again with the packet the
 		 * simulator accepts: the MCTP dword, the NVDM COT dword, COT version 2 size 860 and zero
-		 * FRTS fields (bytes 20..43). The third pass element below sends the GB10B packet (version
-		 * 1, FRTS size set), which a GB20B SEC2 must refuse. */
+		 * FRTS fields (bytes 20..43). The GB10B packet (version 1, FRTS size set) is one more
+		 * scenario after this loop. */
 		static const uint32_t hdr[3] = { 0xC0000000u, 0x1410DE7Eu, 2u | (860u << 16) };
 
 		for (unsigned i = 0; i < sizeof(pkt); i++)

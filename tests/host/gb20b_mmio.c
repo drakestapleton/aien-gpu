@@ -84,6 +84,8 @@ static uint32_t reply(const struct ck_gpu_regs *r, struct g2_out *o)
 			return stop(o, G2_E_REPLY, G2_WHY_TYPE);
 		if (((dw[1] >> 8) & 0xFFFFu) != G2_VENDOR_NV)
 			return stop(o, G2_E_REPLY, G2_WHY_VENDOR);
+		/* as the driver has it (:329-333); never taken: under 8 bytes only dword 0 was read, dw[1]
+		 * is 0 and the type check above has already refused */
 		if (bytes < 8u)
 			return stop(o, G2_E_REPLY, G2_WHY_SHORT);
 	}
