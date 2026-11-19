@@ -25,7 +25,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "gb10_gsp_boot.h"
+#include "gb20b_gsp_boot.h"
 #include "aien_gpu_uapi.h"
 
 uint64_t agpu_om_enter(const void *entry, const uint64_t args[6], uint64_t *status);
@@ -104,6 +104,7 @@ int main(int argc, char **argv)
 	uint8_t *base, *si;
 	uint64_t cot_off, st, verdict;
 	const char *why = NULL;
+	gsp_region crash;
 	char *app;
 
 	for (int i = 1; i < argc; i++) {
@@ -147,8 +148,8 @@ int main(int argc, char **argv)
 
 	in.rm_elf = load(pkg, "rm_elf.bin", &n_elf, 0);
 	in.rm_sig = load(pkg, "rm_sig.bin", &n_sig, 0);
-	in.bootloader = load(pkg, "bootloader.bin", &n_bl, GSP_GB10B_BOOTLOADER_SIZE);
-	in.fmc = load(pkg, "fmc.bin", &n_fmc, 0);
+	in.bootloader = load(pkg, "bootloader.bin", &n_bl, GSP_GB20B_BOOTLOADER_SIZE);
+	in.fmc = load(pkg, "fmc.bin", &n_fmc, GSP_GB20B_FMC_SIZE);
 	in.fmc_hash = load(pkg, "fmc_hash.bin", &n_h, GSP_COT_HASH_SIZE);
 	in.fmc_pubkey = load(pkg, "fmc_pkey.bin", &n_k, GSP_COT_KEY_SIZE);
 	in.fmc_sig = load(pkg, "fmc_sig.bin", &n_s, GSP_COT_SIG_SIZE);
@@ -159,9 +160,9 @@ int main(int argc, char **argv)
 	in.rm_sig_size = n_sig;
 	in.bootloader_size = n_bl;
 	in.fmc_size = n_fmc;
-	in.bl_code_off = GSP_GB10B_BL_CODE_OFF;
-	in.bl_data_off = GSP_GB10B_BL_DATA_OFF;
-	in.bl_manifest_off = GSP_GB10B_BL_MANIFEST_OFF;
+	in.bl_code_off = GSP_GB20B_BL_CODE_OFF;
+	in.bl_data_off = GSP_GB20B_BL_DATA_OFF;
+	in.bl_manifest_off = GSP_GB20B_BL_MANIFEST_OFF;
 
 	if (plan_only) {
 		/* host memory and stand-in device addresses below 40 bits */
@@ -180,6 +181,9 @@ int main(int argc, char **argv)
 			die(2, "NO-DEVICE", strerror(errno));
 		if (info.state != AGPU_STATE_BOUND || !info.fw_ok || !info.heap_bytes || !info.arena_bytes)
 			die(2, "NOT-READY", "module not in state BOUND with firmware, heap and arena");
+		/* the package and the start-up are GB20B's: architecture 0x1b, implementation 0xb */
+		if ((info.boot42 >> 20 & 0x3ff) != (GSP_GB20B_BOOT_42 >> 20 & 0x3ff))
+			die(2, "WRONG-CHIP", "PMC_BOOT_42 is not GB20B");
 		base = mmap(NULL, info.arena_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 		if (base == MAP_FAILED)
 			die(2, "NO-DEVICE", "mmap arena");
@@ -204,8 +208,10 @@ int main(int argc, char **argv)
 	gsp_arena arena;
 	if (gsp_arena_init(&arena, base + GSP_PAGE, info.arena_iova + GSP_PAGE, info.arena_bytes - GSP_PAGE))
 		die(2, "BUILD-REFUSED", "arena not 4 KiB aligned");
-	if (gsp_boot_build(&arena, &in, &plan, &why))
+	if (gsp_boot_build_gb20b(&arena, &in, &plan, &crash, &why))
 		die(2, "BUILD-REFUSED", why);
+	/* evidence of what the chip is handed: GspFwWprMeta as built (256 bytes) */
+	out_bytes("wpr_meta.bin", base + GSP_PAGE + (plan.wpr_meta.pa - arena.pa), GSP_WPR_META_SIZE);
 	/* the COT packet goes into the arena right after the built blocks, where the module reads it */
 	cot_off = GSP_PAGE + ((arena.used + GSP_PAGE - 1) & ~(uint64_t)(GSP_PAGE - 1));
 	if (cot_off + GSP_EMEM_CHANNEL_SIZE > info.arena_bytes)

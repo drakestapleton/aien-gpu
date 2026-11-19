@@ -1,4 +1,9 @@
-# Stage C: GSP INIT_DONE to a runnable compute channel (GB10B, GSP-RM 580.173.02)
+# Stage C: GSP INIT_DONE to a runnable compute channel (GSP-RM 580.173.02)
+
+Chip: the Spark's GPU is GB20B (docs/STATUS.md, 2026-11-18). This document was written for GB10B.
+A HAL audit of every `generated/g_*_nvoc.c` at this tag found one difference from GB10B in what stage C
+ports: the work-submit token (step 11 below, corrected). Every other `_GB10B`-named function cited here
+is one GB20B also takes, or is cited as GB10B's for contrast. Nothing in stage C has run on the chip.
 
 Status: IMPLEMENTED (kmod/aien_gpu_rm.c; om/rm.om, om/rmchan.om, om/rmctl.om, om/rmchk.om,
 om/rmarg.om; tools/aien-gpu-m16.c). Host-tested (tests/host/parity_rm.c, mutants). Hardware NOT_RUN.
@@ -84,8 +89,9 @@ Arguments (om/rmarg.om op 3): entries power of two 8..65536, ring_off 8-aligned,
    UNRESTRICTED_PRIV_ACCESS_MAP(11) init once, nonmapped. physAttr = APERTURE COH_SYS 1 (1:0) |
    GPU_CACHEABLE_NO (2:2) (ctrl2080gpu.h:930-1010, 1095-1102). See "Promote ids" below.
 10. GSP_RM_ALLOC <compute class> under the channel, no params.
-11. Token = (runlist << 16) | ChID (om/rmarg.om op 4; kernel_fifo_gb100.c:89-123; dev_vm.h:620-625;
-    runlist above 63 refused, bit 22 would disable the doorbell).
+11. Token = (runlist << 16) | ChID | bit 30 (om/rmarg.om op 4; kfifoGenerateWorkSubmitTokenHal_GB202,
+    the HAL GB20B takes, kernel_fifo_gb202.c; gb202/dev_vm.h:27-32: RUNLIST_ID 22:16, VECTOR 11:0,
+    RUNLIST_DOORBELL 30:30 ENABLE = 1; runlist above 127 refused).
 12. CONTROL 0xa06c0101 GPFIFO_SCHEDULE on the TSG {bEnable 1, 0, 0} (kernel_channel_group_api.c:1065-1191).
 
 Any failure frees in reverse what GSP accepted; a failed FREE keeps (leaks) that channel's memory and
@@ -318,7 +324,7 @@ Handles are the client's own. CPU-RM uses the same `hClient`/`hObject` values on
 | 2.9 | `RM_ALLOC FERMI_CONTEXT_SHARE_A` (`NV_CTXSHARE_ALLOCATION_PARAMETERS`) | subctx state | generic `GSP_RM_ALLOC` after the constructor (`RS_FLAGS_ALLOC_RPC_TO_ALL`) | resource_list.h:405; rmapi/alloc_free.c:869-929 |
 | 2.10 | `RM_ALLOC BLACKWELL_CHANNEL_GPFIFO_A` (`NV_CHANNEL_ALLOC_PARAMS`) | see §2a | `GSP_RM_ALLOC(hClient, hTSG, hChannel, 0xcd6f?, NV_CHANNEL_ALLOC_PARAMS)` with CPU-filled memdescs; sent through `NV_RM_RPC_ALLOC_CHANNEL`, which takes the `IS_FW_CLIENT` branch, i.e. **`GSP_RM_ALLOC`, not `ALLOC_CHANNEL_DMA` (6)** | gpu/fifo/kernel_channel.c:951-960, 2665-2860; rpc.h:245-269 |
 | 2.11 | `RM_ALLOC BLACKWELL_COMPUTE_B` (`NV_GR_ALLOCATION_PARAMETERS` optional; client passes NULL) | see §2b | (a) `GSP_RM_CONTROL NV2080_CTRL_CMD_GPU_PROMOTE_CTX 0x2080012b` (`ROUTE_TO_PHYSICAL`, g_subdevice_nvoc.c:316); (b) generic `GSP_RM_ALLOC(..., COMPUTE_B, params)` | gpu/gr/kernel_graphics_object.c:51-163, 172-228; resource_list.h:2113; resource_desc_flags.h:45 |
-| 2.12 | `NVC36F_CTRL_CMD_GPFIFO_GET_WORK_SUBMIT_TOKEN` 0xc36f0108 | computed **on the CPU**: `token = (runlistId << 16) | ChID` (`DOORBELL_RUNLIST_ID` 22:16, `VECTOR` 11:0); then writes the notifier | none (vGPU-only RPC branch) | kernel_channel.c:3302-3368; arch/blackwell/kernel_fifo_gb100.c:89-123; common/inc/swref/published/blackwell/gb100/dev_vm.h:620-625 |
+| 2.12 | `NVC36F_CTRL_CMD_GPFIFO_GET_WORK_SUBMIT_TOKEN` 0xc36f0108 | computed **on the CPU**: `token = (runlistId << 16) | ChID | 1 << 30` on GB20B (`DOORBELL_RUNLIST_ID` 22:16, `VECTOR` 11:0, `RUNLIST_DOORBELL` 30:30 ENABLE; GB10B's GB100 HAL has no bit 30); then writes the notifier | none (vGPU-only RPC branch) | kernel_channel.c:3302-3368; arch/blackwell/kernel_fifo_gb100.c:89-123; common/inc/swref/published/blackwell/gb100/dev_vm.h:620-625 |
 | 2.13 | UVM register channel (externally-owned route only) | see §3 | `GSP_RM_CONTROL PROMOTE_CTX` with VAs | nv_gpu_ops.c:10827-10913 |
 | 2.14 | `NVA06C_CTRL_CMD_GPFIFO_SCHEDULE` 0xa06c0101 `{bEnable@0, bSkipSubmit@1, bSkipEnable@2}` (3 B) | checks `kchannelIsSchedulable` for each channel: externally-owned VAS + GR **requires `bIsContextBound`**; sets runlist ids | `GSP_RM_CONTROL` forwarding the same cmd and params | kernel_channel_group_api.c:1065-1191; kernel_channel.c:2189-2227 |
 

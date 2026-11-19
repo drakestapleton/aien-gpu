@@ -76,9 +76,9 @@ seal|parity_mq|put32 m 68 4294967295|put32 m 68 0
 mqput|parity_mq|room = rem sub add gsprd 63 add wr 1 63|room = rem sub add gsprd 63 wr 63
 mqget|parity_mq|if ne ro32 out 36 rxseq|if ne ro32 out 36 ro32 out 36
 mqget|parity_mq|if lt rd32 s 24 32|if lt rd32 s 24 0
-ident|unit_test|if and ne arch 26 ne arch 27|if ne arch 26
-ident|unit_test|if and ne arch 26 ne arch 27|if ne arch 27
-ident|unit_test|if and ne arch 26 ne arch 27|if and ne arch 26 ne arch 28
+ident|unit_test|if ne arch 27|if ne arch 26
+ident|unit_test|if ne arch 27|if and ne arch 26 ne arch 27
+ident|unit_test|if ne arch 27|if ne arch 28
 ident|unit_test|if ne and shr boot42 20 15 11|if ne and shr boot42 20 15 12
 abi|unit_test|for k ulong 52|for k ulong 51
 abi|unit_test|if or eq p 0 gt p 1000|if or eq p 0 gt p 1001
@@ -117,8 +117,11 @@ rmchk|parity_rm|if and eq ed m i 2 1 ne ed m i 12 0|if and eq ed m i 2 1 ne ed m
 rmchk|parity_rm|mul 4096 ms|mul 2048 ms
 rmchk|parity_rm|if or eq c 52928 and eq c 52672 eq get a 0 0|if eq c 52928
 rmchk|parity_rm|s = r32 m 96|s = r32 m 92
-rmchk|parity_rm|if gt get a 1 63|if gt get a 1 64
-rmarg|parity_rm|ret or shl get a 0 16 get a 1|ret or shl get a 0 15 get a 1
+rmchk|parity_rm|if gt get a 1 127|if gt get a 1 128
+rmchk|parity_rm|if gt get a 1 127|if gt get a 1 63
+rmarg|parity_rm|ret or or shl get a 0 16 get a 1 1073741824|ret or or shl get a 0 15 get a 1 1073741824
+rmarg|parity_rm|ret or or shl get a 0 16 get a 1 1073741824|ret or or shl get a 0 16 get a 1 4194304
+rmarg|parity_rm|if or gt get a 0 127 gt get a 1 4095|if or gt get a 0 63 gt get a 1 4095
 rmarg|parity_rm|while lt c n bound 4096|while le c n bound 4096
 rmarg|parity_rm|if eq get a 0 2147483648|if eq get a 0 2147483649
 rmarg|parity_rm|ret and shr get a 0 4 1|ret and shr get a 0 3 1

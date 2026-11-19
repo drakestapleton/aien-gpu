@@ -2,7 +2,8 @@
 # aien-gpu: build the Omega units, check them, run the host tests, build the module.
 #   make om          compile om/*.om with the pinned omc, run tools/kcheck on every unit
 #   make host-test   unit tests and parity against the C oracles (aienux c9678d7b, fetched by pin)
-#   make kmod        build kmod/aien_gpu.ko against the running kernel's headers (never loads it)
+#   make kmod        build kmod/aien_gpu.ko against the running kernel's headers (never loads it) and
+#                    check that it holds the units of this build (tools/ko-units.sh)
 #   make check       om + host-test + kmod + static checks
 # OMC must be the seeded Omega compiler with the pinned sha256 below; nothing else is accepted.
 
@@ -81,9 +82,14 @@ $(B)/parity_rm: tests/host/parity_rm.c $(B)/agpu_om.o $(ORACLE)/.rev
 $(B)/unit_test: tests/host/unit_test.c $(B)/agpu_om.o
 	$(CC) $(HOSTCFLAGS) -o $@ $< $(B)/agpu_om.o
 
-# stage B user-space tool: the aienux L192 package builder (recorded host dependency) + om/abi.om
-$(B)/aien-gpu-boot: tools/aien-gpu-boot.c kmod/aien_gpu_uapi.h $(B)/agpu_om.o $(ORACLE)/.rev
-	$(CC) $(HOSTCFLAGS) -I kmod -I $(ODEV) -Wno-unused-parameter -o $@ $< $(ODEV)/gb10_gsp_boot.c $(B)/agpu_om.o
+# stage B user-space tool: the aienux L192 package builder (recorded host dependency), compiled with
+# GB20B's geometry by tools/gb20b_gsp_boot.c, + om/abi.om
+$(B)/aien-gpu-boot: tools/aien-gpu-boot.c tools/gb20b_gsp_boot.c tools/gb20b_gsp_boot.h kmod/aien_gpu_uapi.h $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) -I kmod -I tools -I $(ODEV) -Wno-unused-parameter -o $@ $< tools/gb20b_gsp_boot.c $(B)/agpu_om.o
+
+# the real COT packet (from plan_test.sh) through om/boot.om on the simulated GB20B SEC2
+$(B)/cot_boot: tests/host/cot_boot.c tests/host/gb20b_sim.c tests/host/gb20b_sim.h tests/host/gb20b_mmio.h $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< tests/host/gb20b_sim.c $(B)/agpu_om.o
 
 # CUDA++ m16 gate over /dev/aien-gpu (stage C); --dry-run needs no device
 $(B)/aien-gpu-m16: tools/aien-gpu-m16.c kmod/aien_gpu_uapi.h | $(B)
@@ -93,7 +99,7 @@ TOOLS := aien-gpu-boot aien-gpu-m16
 tools: $(TOOLS:%=$(B)/%)
 
 HOST_TESTS := unit_test parity_boot parity_seq parity_mq parity_gmmu parity_rm
-host-test: $(HOST_TESTS:%=$(B)/%) tools
+host-test: $(HOST_TESTS:%=$(B)/%) tools $(B)/cot_boot
 	@set -e; for t in $(HOST_TESTS); do ./$(B)/$$t; done
 	sh tests/host/kcheck_controls.sh $(B)/kcheck
 	sh tests/host/mutants.sh $(OMC) $(B)
@@ -101,6 +107,7 @@ host-test: $(HOST_TESTS:%=$(B)/%) tools
 
 kmod: om
 	$(MAKE) -C kmod KDIR=$(KDIR) OMBUILD=$(abspath $(B))
+	sh tools/ko-units.sh $(B) kmod/aien_gpu.ko $(UNITS)
 
 static: kmod
 	OMBUILD=$(abspath $(B)) sh tools/static-checks.sh $(KDIR)
