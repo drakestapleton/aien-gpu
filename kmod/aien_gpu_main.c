@@ -11,6 +11,7 @@
  * Status: IMPLEMENTED, host and QEMU tested; hardware NOT_RUN (docs/STATUS.md).
  */
 #include <linux/module.h>
+#include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/firmware.h>
 #include <linux/miscdevice.h>
@@ -39,7 +40,25 @@ static bool selftest_trap;
 module_param(selftest_trap, bool, 0444);
 MODULE_PARM_DESC(selftest_trap, "self-test also drives one Omega unit into a trap and checks it is contained");
 
-static struct agpu_dev g;		/* one GB10 per machine */
+static struct agpu_dev g;
+static int g_nirqs;
+
+static irqreturn_t agpu_irq(int irq, void *dev)
+{
+	return IRQ_HANDLED;
+}
+
+static void agpu_free_irqs(struct pci_dev *pdev)
+{
+	int i;
+
+	for (i = 0; i < g_nirqs; i++)
+		free_irq(pci_irq_vector(pdev, i), &g);
+	if (g_nirqs > 0) {
+		pci_free_irq_vectors(pdev);
+		g_nirqs = 0;
+	}
+}		/* one GB10 per machine */
 /* /dev/aien-gpu's mapping, to revoke arena mappings at boot */
 static struct address_space *g_mapping;
 
@@ -443,6 +462,27 @@ static int agpu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return -ENODEV;
 	}
 	pci_set_master(pdev);
+	{
+		int nvec = pci_alloc_irq_vectors(pdev, 1, 9, PCI_IRQ_MSIX);
+
+		if (nvec > 0) {
+			int i;
+
+			for (i = 0; i < nvec; i++) {
+				if (request_irq(pci_irq_vector(pdev, i), agpu_irq, 0, AGPU_NAME,
+						&g)) {
+					while (i-- > 0)
+						free_irq(pci_irq_vector(pdev, i), &g);
+					pci_free_irq_vectors(pdev);
+					nvec = 0;
+					break;
+				}
+			}
+			g_nirqs = nvec;
+			if (nvec > 0)
+				dev_info(&pdev->dev, "MSI-X enabled: %d vectors\n", nvec);
+		}
+	}
 	g.pdev = pdev;
 	g.info.abi = AGPU_ABI_VERSION;
 	g.info.bar0_bytes = g.bar0_bytes;
@@ -477,6 +517,8 @@ static int agpu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		 g.heap_bytes, &g.heap_iova);
 	return 0;
 fail:
+	agpu_free_irqs(pdev);
+	agpu_free_irqs(pdev);
 	agpu_free_mem();
 	g.pdev = NULL;
 	memset(&g.info, 0, sizeof(g.info));
