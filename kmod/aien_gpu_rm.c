@@ -688,7 +688,7 @@ static int chan_build(struct agpu_file *f, struct agpu_chan *c, struct agpu_chan
 	u32 code;
 	int rc;
 
-	rc = agpu_mem_iova(f, in->ring_handle, in->ring_off, (u64)in->entries * 8, &iova[0],
+	rc = agpu_mem_iova(f, in->ring_handle, in->ring_off, (u64)in->entries * 8, NULL,
 			   &gva[0]) ?:
 	     agpu_mem_iova(f, in->userd_handle, in->userd_off, 512, &iova[1], &gva[1]) ?:
 	     agpu_mem_iova(f, in->err_handle, 0, RM_ERR_BYTES, &iova[2], &gva[2]);

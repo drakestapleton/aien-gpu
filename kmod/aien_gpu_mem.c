@@ -623,12 +623,15 @@ int agpu_mem_iova(struct agpu_file *f, u32 handle, u64 off, u64 len, dma_addr_t 
 	rc = mc(M_SLICE, agpu_no_ranges, off, len, o->size, 0, &r, NULL);
 	if (rc)
 		return rc;
-	for (p = off >> 12; p < (off + len - 1) >> 12; p++) {
-		rc = mc(M_CONTIG, agpu_no_ranges, o->iova[p], o->iova[p + 1], 0, 0, &r, NULL);
-		if (rc)
-			return rc;
+	if (iova) {
+		for (p = off >> 12; p < (off + len - 1) >> 12; p++) {
+			rc = mc(M_CONTIG, agpu_no_ranges, o->iova[p], o->iova[p + 1], 0, 0, &r,
+				NULL);
+			if (rc)
+				return rc;
+		}
+		*iova = o->iova[off >> 12] + (off & 4095);
 	}
-	*iova = o->iova[off >> 12] + (off & 4095);
 	*gpu_va = o->va + off;
 	return 0;
 }
