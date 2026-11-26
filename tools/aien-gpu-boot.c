@@ -23,6 +23,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "gb20b_gsp_boot.h"
@@ -201,12 +202,57 @@ int main(int argc, char **argv)
 		if (!notify)
 			put64(si, 48, info.arena_iova);
 	}
-	static const gsp_reg_entry regs[1] = {
-		{ "RmProfilingAdminOnly", GSP_REG_DWORD, 0, NULL, 0 },
+	/* Ground-truth GB20B GspSystemInfo deltas captured from live nvidia.ko 580.173.02 */
+	put32(si, 236, 0x59u); /* acpiMethodData.jtMethodData.status = NV_ERR_OBJECT_NOT_FOUND */
+	put32(si, 828, 0x59u); /* acpiMethodData.capsMethodData.status = NV_ERR_OBJECT_NOT_FOUND */
+	put32(si, 908, 1u);    /* bPreserveVideoMemoryAllocations = 1 */
+	{
+		struct timespec ts;
+		if (clock_gettime(CLOCK_REALTIME, &ts) == 0)
+			put64(si, 848, (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec);
+	}
+	static const gsp_reg_entry regs[37] = {
+		{ "GrdmaPciTopoCheckOverride", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "CreateImexChannel0", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "ImexChannelCount", GSP_REG_DWORD, 2048u, NULL, 0 },
+		{ "DmaRemapPeerMmio", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "OpenRmEnableUnsupportedGpus", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "EnableDbgBreakpoint", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "RmNvlinkBandwidthLinkCount", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "EnableGpuFirmwareLogs", GSP_REG_DWORD, 2u, NULL, 0 },
+		{ "EnableGpuFirmware", GSP_REG_DWORD, 18u, NULL, 0 },
+		{ "EnableResizableBar", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "EnablePCIERelaxedOrderingMode", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "RegisterPCIDriver", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "DynamicPowerManagementVideoMemoryThreshold", GSP_REG_DWORD, 200u, NULL, 0 },
+		{ "DynamicPowerManagement", GSP_REG_DWORD, 3u, NULL, 0 },
+		{ "S0ixPowerManagementVideoMemoryThreshold", GSP_REG_DWORD, 256u, NULL, 0 },
+		{ "EnableS0ixPowerManagement", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "PreserveVideoMemoryAllocations", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "RmProfilingAdminOnly", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "NvLinkDisable", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "EnableUserNUMAManagement", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "EnableStreamMemOPs", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "IgnoreMMIOCheck", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "VMallocHeapMaxSize", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "KMallocHeapMaxSize", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "MemoryPoolSize", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "EnablePCIeGen3", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "EnableMSI", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "UsePageAttributeTable", GSP_REG_DWORD, 0xffffffffu, NULL, 0 },
+		{ "InitializeSystemMemoryAllocations", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "DeviceFileMode", GSP_REG_DWORD, 438u, NULL, 0 },
+		{ "DeviceFileGID", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "DeviceFileUID", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "ModifyDeviceFiles", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "RmLogonRC", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "ResmanDebugLevel", GSP_REG_DWORD, 0xffffffffu, NULL, 0 },
+		{ "RMForcePcieConfigSave", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "RMSecBusResetEnable", GSP_REG_DWORD, 1u, NULL, 0 },
 	};
 	in.system_info = si;
 	in.regs = regs;
-	in.nregs = 1;
+	in.nregs = 37;
 	in.sysmem_heap_pa = info.heap_iova;
 	in.sysmem_heap_size = info.heap_bytes;
 	in.dma_bits = info.dma_bits;
