@@ -23,7 +23,8 @@
 /* GSP_ELEM_SIZE_MAX: the largest message, staging buffer size */
 #define AGPU_MSG_BYTES 65536u
 #define AGPU_SEQ_MAX_OPS 2048u
-#define AGPU_OM_FAIL 1000000u		/* Omega units: results at or above this are refusals */
+#define AGPU_OM_FAIL 1000000u		/* Omega unit refusals: [FAIL, FAIL_MAX) */
+#define AGPU_OM_FAIL_MAX 1000100u
 
 /* GSP events read from the status queue (rpc_global_enums.h, gb10_gsp_boot.h) */
 #define AGPU_EV_INIT_DONE 0x1001u

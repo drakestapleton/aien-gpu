@@ -11,6 +11,7 @@
  * Status: IMPLEMENTED, host and QEMU tested; hardware NOT_RUN (docs/STATUS.md).
  */
 #include <linux/module.h>
+#include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/firmware.h>
 #include <linux/miscdevice.h>
@@ -39,7 +40,36 @@ static bool selftest_trap;
 module_param(selftest_trap, bool, 0444);
 MODULE_PARM_DESC(selftest_trap, "self-test also drives one Omega unit into a trap and checks it is contained");
 
-static struct agpu_dev g;		/* one GB10 per machine */
+static struct agpu_dev g;
+static int g_nirqs;
+static void *g_flush_buf;
+static dma_addr_t g_flush_iova;
+
+/* NV_PFB_FBHUB0_PCIE_FLUSH_SYSMEM_ADDR_{LO,HI} (gb10b/dev_fbhub.h:27-34) */
+#define AGPU_FBHUB0_FLUSH_LO 0x008a1d58u
+#define AGPU_FBHUB0_FLUSH_HI 0x008a1d5cu
+
+static irqreturn_t agpu_irq(int irq, void *dev)
+{
+	return IRQ_HANDLED;
+}
+
+static void agpu_free_irqs(struct pci_dev *pdev)
+{
+	int i;
+
+	for (i = 0; i < g_nirqs; i++)
+		free_irq(pci_irq_vector(pdev, i), &g);
+	if (g_flush_buf) {
+		dma_free_coherent(&pdev->dev, PAGE_SIZE, g_flush_buf, g_flush_iova);
+		g_flush_buf = NULL;
+		g_flush_iova = 0;
+	}
+	if (g_nirqs > 0) {
+		pci_free_irq_vectors(pdev);
+		g_nirqs = 0;
+	}
+}		/* one GB10 per machine */
 /* /dev/aien-gpu's mapping, to revoke arena mappings at boot */
 static struct address_space *g_mapping;
 
@@ -79,12 +109,15 @@ static int agpu_selftest(void)
 	u64 *ops;
 	int rc = 0, i;
 
+	rc |= agpu_om("ident", agpu_om_ident, 0x10de, 0x2e12, 64ull << 20, 0x1bb000a1,
+		      0x1bba1000, 1, &r) ?: st_check("ident GB20B", r == 0);
 	rc |= agpu_om("ident", agpu_om_ident, 0x10de, 0x2e12, 64ull << 20, 0x1b0000a1,
-		      (0x1aull << 24) | (0xbull << 20), 1, &r) ?: st_check("ident GB10B", r == 0);
+		      (0x1aull << 24) | (0xbull << 20), 1, &r) ?:
+	      st_check("ident GB10B refused", r == 6);
 	rc |= agpu_om("ident", agpu_om_ident, 0x1b36, 0x0005, 4096, 0, 0, 0, &r) ?:
 	      st_check("ident other vendor", r == 1);
 	/* a valid AGPU_BOOT block (tests/host/unit_test.c good_boot) */
-	st_put32(blk, 1);
+	st_put32(blk, AGPU_BOOT_VERSION);
 	st_put32(blk + 8, 0x1000);
 	st_put32(blk + 16, 868);
 	st_put32(blk + 24, 0x2000);
@@ -97,7 +130,7 @@ static int agpu_selftest(void)
 	st_put32(blk + 68, 30000);
 	rc |= agpu_om("abi", agpu_om_abi, 1, (u64)blk, 0x800000000ull, 64ull << 20, 0, 0, &r) ?:
 	      st_check("abi accept", r == 0);
-	blk[0] = 2;
+	blk[0] = 1;	/* the GB10B-era block */
 	rc |= agpu_om("abi", agpu_om_abi, 1, (u64)blk, 0x800000000ull, 64ull << 20, 0, 0, &r) ?:
 	      st_check("abi version", r == 2);
 	if (rc)
@@ -440,6 +473,27 @@ static int agpu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return -ENODEV;
 	}
 	pci_set_master(pdev);
+	{
+		int nvec = pci_alloc_irq_vectors(pdev, 1, 9, PCI_IRQ_MSIX);
+
+		if (nvec > 0) {
+			int i;
+
+			for (i = 0; i < nvec; i++) {
+				if (request_irq(pci_irq_vector(pdev, i), agpu_irq, 0, AGPU_NAME,
+						&g)) {
+					while (i-- > 0)
+						free_irq(pci_irq_vector(pdev, i), &g);
+					pci_free_irq_vectors(pdev);
+					nvec = 0;
+					break;
+				}
+			}
+			g_nirqs = nvec;
+			if (nvec > 0)
+				dev_info(&pdev->dev, "MSI-X enabled: %d vectors\n", nvec);
+		}
+	}
 	g.pdev = pdev;
 	g.info.abi = AGPU_ABI_VERSION;
 	g.info.bar0_bytes = g.bar0_bytes;
@@ -455,8 +509,9 @@ static int agpu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		g.arena = dma_alloc_coherent(&pdev->dev, g.arena_bytes, &g.arena_iova, GFP_KERNEL);
 	if (g.heap_bytes)
 		g.heap = dma_alloc_coherent(&pdev->dev, g.heap_bytes, &g.heap_iova, GFP_KERNEL);
+	g_flush_buf = dma_alloc_coherent(&pdev->dev, PAGE_SIZE, &g_flush_iova, GFP_KERNEL);
 	if (!g.msg_tx || !g.msg_rx || !g.seq_ops || (g.arena_bytes && !g.arena) ||
-	    (g.heap_bytes && !g.heap)) {
+	    (g.heap_bytes && !g.heap) || !g_flush_buf) {
 		rc = -ENOMEM;
 		goto fail;
 	}
@@ -464,6 +519,12 @@ static int agpu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	g.info.arena_iova = g.arena_iova;
 	g.info.heap_bytes = g.heap_bytes;
 	g.info.heap_iova = g.heap_iova;
+	/* Program GB10B/GB20B sysmem flush buffer before GSP-RM boots (kern_mem_sys_gb10b.c) */
+	iowrite32((u32)((g_flush_iova >> 32) & 0x000fffffu), g.bar0 + AGPU_FBHUB0_FLUSH_HI);
+	iowrite32((u32)(g_flush_iova & 0xffffff00u), g.bar0 + AGPU_FBHUB0_FLUSH_LO);
+	dev_info(&pdev->dev, "sysmem flush buffer programmed at %pad (lo=%#x hi=%#x)\n",
+		 &g_flush_iova, ioread32(g.bar0 + AGPU_FBHUB0_FLUSH_LO),
+		 ioread32(g.bar0 + AGPU_FBHUB0_FLUSH_HI));
 	g.info.state = AGPU_STATE_BOUND;
 	rc = misc_register(&agpu_misc);
 	if (rc)
@@ -474,6 +535,8 @@ static int agpu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		 g.heap_bytes, &g.heap_iova);
 	return 0;
 fail:
+	agpu_free_irqs(pdev);
+	agpu_free_irqs(pdev);
 	agpu_free_mem();
 	g.pdev = NULL;
 	memset(&g.info, 0, sizeof(g.info));

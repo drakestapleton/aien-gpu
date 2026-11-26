@@ -3,6 +3,8 @@
 # mutants.sh OMC BUILD -- each line below plants one small mistake in one Omega unit (a literal,
 # single-line replacement), rebuilds that unit with the pinned omc, links the host test that must
 # notice it, and requires that test to FAIL. A mutant that still passes means the tests are too weak.
+# Line format: unit|test|from|to[|n]. The n-th line of the unit that contains `from` is changed
+# (default the first), so two lines with the same text each get a mutant of their own.
 # Prints MUTANTS PASS killed=N/N or the surviving mutant; exit status 0 only when all are killed.
 set -u
 OMC=${1:?usage: mutants.sh OMC BUILD}
@@ -18,7 +20,7 @@ NVSRC=${NVSRC:-$HOME/workspace/_ext/open-gpu-kernel-modules-580.173.02/src}
 CF="$CF -I $NVSRC/common/sdk/nvidia/inc -I $NVSRC/common/sdk/nvidia/inc/ctrl -I $NVSRC/common/inc"
 srcs() { # test -> extra C sources
 	case $1 in
-	parity_boot) echo "$ORACLE/gpu/gsp_mmio.c $ORACLE/gpu/gsp_sim.c" ;;
+	parity_boot) echo "$ROOT/tests/host/gb20b_mmio.c $ROOT/tests/host/gb20b_sim.c" ;;
 	parity_seq) echo "$ORACLE/gpu/gsp_seq.c" ;;
 	parity_mq) echo "$ORACLE/dev/gb10_gsp_boot.c" ;;
 	parity_rm) echo "$ORACLE/dev/gb10_gsp_boot.c" ;;
@@ -27,12 +29,13 @@ srcs() { # test -> extra C sources
 }
 killed=0
 total=0
-while IFS='|' read -r unit test from to; do
+while IFS='|' read -r unit test from to occ; do
 	[ -n "$unit" ] || continue
+	occ=${occ:-1}
 	total=$((total + 1))
 	rm -rf "$T/u"; mkdir -p "$T/u"
 	cp "$B"/*.bin "$T/u/"
-	awk -v f="$from" -v t="$to" 'BEGIN{done=0} { if (!done) { i = index($0, f); if (i) { $0 = substr($0, 1, i-1) t substr($0, i+length(f)); done=1 } } print } END{ if (!done) exit 3 }' \
+	awk -v f="$from" -v t="$to" -v want="$occ" 'BEGIN{seen=0; done=0} { if (!done) { i = index($0, f); if (i) { seen++; if (seen == want) { $0 = substr($0, 1, i-1) t substr($0, i+length(f)); done=1 } } } print } END{ if (!done) exit 3 }' \
 		"$ROOT/om/$unit.om" > "$T/m.om" || { echo "MUTANTS FAIL pattern not found in $unit: $from"; exit 1; }
 	if ! "$OMC" < "$T/m.om" > "$T/u/$unit.bin" 2> "$T/omc.err"; then
 		echo "mutant $total ($unit) refused by omc: $(cat "$T/omc.err")"; killed=$((killed + 1)); continue
@@ -47,10 +50,31 @@ while IFS='|' read -r unit test from to; do
 	killed=$((killed + 1))
 done <<'EOF'
 boot|parity_boot|ret bact act 2 8653828 sub mul dw 4 4|ret bact act 2 8653828 sub mul dw 4 0
-boot|parity_boot|if ge n get st 4|if gt n get st 4
+boot|parity_boot|if ge n get st 4|if gt n get st 4|1
+boot|parity_boot|if ge n get st 4|if gt n get st 4|2
 boot|parity_boot|ne and obs 4294967040 3135193344|ne and obs 4294967040 0
 boot|parity_boot|if eq and obs 128 0|if eq and obs 64 0
 boot|parity_boot|if eq obs shr pa 32|if eq obs shr pa 31
+boot|parity_boot|if eq obs 255|if eq and obs 255 255
+boot|parity_boot|ret bact act 1 1504 0|ret bact act 1 1508 0
+boot|parity_boot|if ne get st 11 obs|if eq get st 11 obs
+boot|parity_boot|if ge n get st 5|if gt n get st 5
+boot|parity_boot|sz = and sub add add obs 4294967296 4 get st 11 4294967295|sz = and sub add add obs 4294967296 0 get st 11 4294967295
+boot|parity_boot|if or lt sz 4 gt sz 1024|if or lt sz 4 gt sz 1028
+boot|parity_boot|if or lt sz 4 gt sz 1024|if or lt sz 1 gt sz 1024
+boot|parity_boot|ret bact act 2 8653504 33554432|ret bact act 2 8653504 16777216
+boot|parity_boot|ret bact act 2 8653956 get st 11|ret bact act 2 8653952 get st 11
+boot|parity_boot|if ne ememdw get st 10 div sz 4|if ne ememdw get st 10 ememdw get st 10
+boot|parity_boot|if ne and d1 127 126|if ne and d1 126 126
+boot|parity_boot|if ne and shr d1 8 65535 4318|if ne and shr d1 16 255 16
+boot|parity_boot|if or ne som 1 ne eom 1|if ne som 1
+boot|parity_boot|if eq som 1|if ge som 0
+boot|parity_boot|if and ne t 21 ne t 24|if and ne t 21 ne t 20
+boot|parity_boot|if lt sz 20|if lt sz 16
+boot|parity_boot|if lt sz 20|if lt sz 19
+boot|parity_boot|for k ulong 24|for k ulong 20
+boot|parity_boot|if ne get st 19 0|if ne get st 19 get st 19
+boot|parity_boot|if eq i 4|if eq i 5
 seal|parity_mq|put32 m 32 xor shr x 32 and x 4294967295|put32 m 32 and x 4294967295
 seq|parity_seq|ret 5|ret 4
 seq|parity_seq|ge get ops add base 2 8|ge get ops add base 2 9
@@ -60,8 +84,13 @@ seal|parity_mq|put32 m 68 4294967295|put32 m 68 0
 mqput|parity_mq|room = rem sub add gsprd 63 add wr 1 63|room = rem sub add gsprd 63 wr 63
 mqget|parity_mq|if ne ro32 out 36 rxseq|if ne ro32 out 36 ro32 out 36
 mqget|parity_mq|if lt rd32 s 24 32|if lt rd32 s 24 0
+ident|unit_test|if ne arch 27|if ne arch 26
+ident|unit_test|if ne arch 27|if and ne arch 26 ne arch 27
+ident|unit_test|if ne arch 27|if ne arch 28
 ident|unit_test|if ne and shr boot42 20 15 11|if ne and shr boot42 20 15 12
 abi|unit_test|for k ulong 52|for k ulong 51
+abi|unit_test|if ne ld32 a 0 2|if ne ld32 a 0 1
+abi|unit_test|if ne ld32 a 0 2|if lt ld32 a 0 2
 abi|unit_test|if or eq p 0 gt p 1000|if or eq p 0 gt p 1001
 gmmu|parity_gmmu|ret or or pa 16 shl ap 1|ret or or pa 8 shl ap 1
 gmmu|parity_gmmu|pcf = add 16 and fl 1|pcf = add 0 and fl 1
@@ -98,8 +127,11 @@ rmchk|parity_rm|if and eq ed m i 2 1 ne ed m i 12 0|if and eq ed m i 2 1 ne ed m
 rmchk|parity_rm|mul 4096 ms|mul 2048 ms
 rmchk|parity_rm|if or eq c 52928 and eq c 52672 eq get a 0 0|if eq c 52928
 rmchk|parity_rm|s = r32 m 96|s = r32 m 92
-rmchk|parity_rm|if gt get a 1 63|if gt get a 1 64
-rmarg|parity_rm|ret or shl get a 0 16 get a 1|ret or shl get a 0 15 get a 1
+rmchk|parity_rm|if gt get a 1 127|if gt get a 1 128
+rmchk|parity_rm|if gt get a 1 127|if gt get a 1 63
+rmarg|parity_rm|ret or or shl get a 0 16 get a 1 1073741824|ret or or shl get a 0 15 get a 1 1073741824
+rmarg|parity_rm|ret or or shl get a 0 16 get a 1 1073741824|ret or or shl get a 0 16 get a 1 4194304
+rmarg|parity_rm|if or gt get a 0 127 gt get a 1 4095|if or gt get a 0 63 gt get a 1 4095
 rmarg|parity_rm|while lt c n bound 4096|while le c n bound 4096
 rmarg|parity_rm|if eq get a 0 2147483648|if eq get a 0 2147483649
 rmarg|parity_rm|ret and shr get a 0 4 1|ret and shr get a 0 3 1

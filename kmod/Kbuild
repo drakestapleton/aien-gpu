@@ -3,3 +3,6 @@ obj-m := aien_gpu.o
 aien_gpu-y := aien_gpu_main.o aien_gpu_boot.o aien_gpu_rpc.o aien_gpu_mem.o aien_gpu_rm.o agpu_om.o
 # agpu_om.S .incbin's the Omega units that the top-level `make om` built and kcheck passed.
 asflags-y += -Wa,-I$(OMBUILD)
+# .incbin is not a dependency the assembler reports: name the units, or the module keeps old ones
+# (tools/ko-units.sh checks the result).
+$(obj)/agpu_om.o: $(wildcard $(OMBUILD)/*.bin)

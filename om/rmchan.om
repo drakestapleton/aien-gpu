@@ -77,7 +77,7 @@ fn chanok a edit ulong 64 to ulong
 if not nonzero a 0 5
 ret 1000002
 end
-if not nonzero a 8 3
+if or eq get a 8 0 eq get a 10 0
 ret 1000002
 end
 if not fits a 0 5

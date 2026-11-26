@@ -1,14 +1,21 @@
 # SPDX-License-Identifier: MIT OR GPL-2.0-only
 # aien-gpu: build the Omega units, check them, run the host tests, build the module.
 #   make om          compile om/*.om with the pinned omc, run tools/kcheck on every unit
-#   make host-test   unit tests and parity against the C oracles (aienux c9678d7b, fetched by pin)
-#   make kmod        build kmod/aien_gpu.ko against the running kernel's headers (never loads it)
+#   make host-test   unit tests and parity against the C oracles (aienux c9678d7b, kept in this
+#                    repository as the branch oracle/aienux-c9678d7b)
+#   make kmod        build kmod/aien_gpu.ko against the running kernel's headers (never loads it) and
+#                    check that it holds the units of this build (tools/ko-units.sh)
 #   make check       om + host-test + kmod + static checks
 # OMC must be the seeded Omega compiler with the pinned sha256 below; nothing else is accepted.
 
 OMC ?= $(error set OMC=/path/to/omega-mv/seed/out/omc (sha256 $(OMC_SHA256)))
 OMC_SHA256 := 189ada82e00bb440cb41351bd252cc68c54a1b1050051cc42a1df700081c3b54
-ORACLE_REPO := https://github.com/aien-dev/aienux.git
+# The C oracles are aien-dev/aienux feat/own-gpu-driver at ORACLE_REV. That commit is kept in this
+# repository as the branch ORACLE_REF (a history of its own), so a clone needs no other repository:
+# a normal clone already holds the commit, a single-branch clone fetches the branch from ORACLE_REPO
+# (a remote name, path or URL of this repository). No other place is searched.
+ORACLE_REPO ?= origin
+ORACLE_REF := oracle/aienux-c9678d7b
 ORACLE_REV := c9678d7b5286b15cfdb92a648264de6d3e9e72ac
 KDIR ?= /lib/modules/$(shell uname -r)/build
 B := build
@@ -43,18 +50,25 @@ $(B)/agpu_om.o: kmod/agpu_om.S om
 	$(CC) -c -Wa,-I$(B) -o $@ $<
 
 ORACLE := $(B)/oracle
-$(ORACLE)/.rev:
-	rm -rf $(ORACLE)
-	git clone -q --filter=blob:none $(ORACLE_REPO) $(ORACLE)
-	git -C $(ORACLE) checkout -q $(ORACLE_REV)
-	git -C $(ORACLE) rev-parse HEAD > $@
+$(ORACLE)/.rev: | $(B)
+	@set -e; rm -rf $(ORACLE); \
+	git cat-file -e $(ORACLE_REV)^{commit} 2>/dev/null || git fetch -q $(ORACLE_REPO) $(ORACLE_REF) || \
+		{ echo "oracle: $(ORACLE_REV) is not in this clone and git fetch $(ORACLE_REPO) $(ORACLE_REF) failed"; exit 1; }; \
+	git clone -q --shared --no-checkout "$(CURDIR)" $(ORACLE); \
+	git -C $(ORACLE) checkout -q --detach $(ORACLE_REV); \
+	got=$$(git -C $(ORACLE) rev-parse HEAD); \
+	[ "$$got" = "$(ORACLE_REV)" ] || { echo "ORACLE HEAD $$got != $(ORACLE_REV)"; exit 1; }; \
+	echo "$$got" > $@
 
 OGPU := $(ORACLE)/native/kernel/gpu
 ODEV := $(ORACLE)/native/kernel/dev
 OCFLAGS := -I $(OGPU) -I $(ODEV) -Wno-unused-parameter -Wno-sign-compare
 
-$(B)/parity_boot: tests/host/parity_boot.c $(B)/agpu_om.o $(ORACLE)/.rev
-	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(OGPU)/gsp_mmio.c $(OGPU)/gsp_sim.c $(B)/agpu_om.o
+# om/boot.om against the GB20B reference and simulator in tests/host (written from NVIDIA's
+# 580.173.02 GB20B HALs); the oracle only lends struct ck_gpu_regs (gmmu.h).
+G2 := tests/host/gb20b_mmio.c tests/host/gb20b_sim.c
+$(B)/parity_boot: tests/host/parity_boot.c $(G2) tests/host/gb20b_mmio.h tests/host/gb20b_sim.h $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(G2) $(B)/agpu_om.o
 
 $(B)/parity_seq: tests/host/parity_seq.c $(B)/agpu_om.o $(ORACLE)/.rev
 	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< $(OGPU)/gsp_seq.c $(B)/agpu_om.o
@@ -70,17 +84,34 @@ $(B)/parity_gmmu: tests/host/parity_gmmu.c $(B)/agpu_om.o $(ORACLE)/.rev
 # NVIDIA 580.173.02 structs (MIT SDK headers, NVSRC) and the framing against the aienux oracle.
 NVSRC ?= $(HOME)/workspace/_ext/open-gpu-kernel-modules-580.173.02/src
 NVSDK := -I $(NVSRC)/common/sdk/nvidia/inc -I $(NVSRC)/common/sdk/nvidia/inc/ctrl -I $(NVSRC)/common/inc
-$(B)/parity_rm: tests/host/parity_rm.c $(B)/agpu_om.o $(ORACLE)/.rev
-	@test -f $(NVSRC)/common/sdk/nvidia/inc/alloc/alloc_channel.h || \
-		{ echo "NVSRC=$(NVSRC): open-gpu-kernel-modules 580.173.02 src/ not found"; exit 1; }
+# NVSRC is outside this repository. The files of it that the gates read (the 56 headers parity_rm.c
+# opens and the two GB20B bindata sources of tools/package.sh) are pinned as one hash; see
+# tools/nvsrc-pin.sh. To re-pin after reading a new tree: make nvsrc-print.
+NVSRC_SHA256 := f0ba856741886e14e2bd0bab4a0db46937423e9af895ef08e96d73bc84c00389
+NVSRC_DEPS = $(CC) $(HOSTCFLAGS) $(OCFLAGS) $(NVSDK) -M tests/host/parity_rm.c
+$(B)/nvsrc.ok: tools/nvsrc-pin.sh tests/host/parity_rm.c Makefile $(ORACLE)/.rev | $(B)
+	@sh tools/nvsrc-pin.sh "$(NVSRC)" $(NVSRC_SHA256) $(NVSRC_DEPS) > $@.tmp || { cat $@.tmp; rm -f $@.tmp; exit 1; }
+	@cat $@.tmp; mv $@.tmp $@
+nvsrc-print: $(ORACLE)/.rev
+	sh tools/nvsrc-pin.sh "$(NVSRC)" print $(NVSRC_DEPS)
+$(B)/parity_rm: tests/host/parity_rm.c $(B)/agpu_om.o $(ORACLE)/.rev $(B)/nvsrc.ok
 	$(CC) $(HOSTCFLAGS) $(OCFLAGS) $(NVSDK) -o $@ $< $(ODEV)/gb10_gsp_boot.c $(B)/agpu_om.o
 
 $(B)/unit_test: tests/host/unit_test.c $(B)/agpu_om.o
 	$(CC) $(HOSTCFLAGS) -o $@ $< $(B)/agpu_om.o
 
-# stage B user-space tool: the aienux L192 package builder (recorded host dependency) + om/abi.om
-$(B)/aien-gpu-boot: tools/aien-gpu-boot.c kmod/aien_gpu_uapi.h $(B)/agpu_om.o $(ORACLE)/.rev
-	$(CC) $(HOSTCFLAGS) -I kmod -I $(ODEV) -Wno-unused-parameter -o $@ $< $(ODEV)/gb10_gsp_boot.c $(B)/agpu_om.o
+# stage B user-space tool: the aienux L192 package builder (recorded host dependency), compiled with
+# GB20B's geometry by tools/gb20b_gsp_boot.c, + om/abi.om
+$(B)/aien-gpu-boot: tools/aien-gpu-boot.c tools/gb20b_gsp_boot.c tools/gb20b_gsp_boot.h kmod/aien_gpu_uapi.h $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) -I kmod -I tools -I $(ODEV) -Wno-unused-parameter -o $@ $< tools/gb20b_gsp_boot.c $(B)/agpu_om.o
+
+# the real COT packet (from plan_test.sh) through om/boot.om on the simulated GB20B SEC2
+$(B)/cot_boot: tests/host/cot_boot.c tests/host/gb20b_sim.c tests/host/gb20b_sim.h tests/host/gb20b_mmio.h $(B)/agpu_om.o $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) $(OCFLAGS) -o $@ $< tests/host/gb20b_sim.c $(B)/agpu_om.o
+
+# direct unit tests & negative controls for tools/gb20b_gsp_boot.c (reaches builder size/offset checks)
+$(B)/test_gb20b_builder: tests/host/test_gb20b_builder.c tools/gb20b_gsp_boot.c tools/gb20b_gsp_boot.h $(ORACLE)/.rev
+	$(CC) $(HOSTCFLAGS) -I tools $(OCFLAGS) -o $@ $< tools/gb20b_gsp_boot.c
 
 # CUDA++ m16 gate over /dev/aien-gpu (stage C); --dry-run needs no device
 $(B)/aien-gpu-m16: tools/aien-gpu-m16.c kmod/aien_gpu_uapi.h | $(B)
@@ -89,15 +120,21 @@ $(B)/aien-gpu-m16: tools/aien-gpu-m16.c kmod/aien_gpu_uapi.h | $(B)
 TOOLS := aien-gpu-boot aien-gpu-m16
 tools: $(TOOLS:%=$(B)/%)
 
-HOST_TESTS := unit_test parity_boot parity_seq parity_mq parity_gmmu parity_rm
-host-test: $(HOST_TESTS:%=$(B)/%) tools
+HOST_TESTS := unit_test parity_boot test_gb20b_builder parity_seq parity_mq parity_gmmu parity_rm
+# units whose comparisons get generated off-by-one mutants (tests/host/boundary.sh), with their test
+BOUNDARY := boot parity_boot ident unit_test
+host-test: $(HOST_TESTS:%=$(B)/%) tools $(B)/cot_boot $(B)/nvsrc.ok
 	@set -e; for t in $(HOST_TESTS); do ./$(B)/$$t; done
 	sh tests/host/kcheck_controls.sh $(B)/kcheck
 	sh tests/host/mutants.sh $(OMC) $(B)
+	sh tests/host/boundary.sh $(OMC) $(B) $(BOUNDARY)
+	sh tools/claims-lint.sh
+	sh tools/claims-lint.sh --selftest
 	sh tests/host/plan_test.sh $(ORACLE) $(B)
 
 kmod: om
 	$(MAKE) -C kmod KDIR=$(KDIR) OMBUILD=$(abspath $(B))
+	sh tools/ko-units.sh $(B) kmod/aien_gpu.ko $(UNITS)
 
 static: kmod
 	OMBUILD=$(abspath $(B)) sh tools/static-checks.sh $(KDIR)

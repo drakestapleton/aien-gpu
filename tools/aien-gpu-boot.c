@@ -23,9 +23,10 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
-#include "gb10_gsp_boot.h"
+#include "gb20b_gsp_boot.h"
 #include "aien_gpu_uapi.h"
 
 uint64_t agpu_om_enter(const void *entry, const uint64_t args[6], uint64_t *status);
@@ -104,6 +105,7 @@ int main(int argc, char **argv)
 	uint8_t *base, *si;
 	uint64_t cot_off, st, verdict;
 	const char *why = NULL;
+	gsp_region crash;
 	char *app;
 
 	for (int i = 1; i < argc; i++) {
@@ -147,8 +149,8 @@ int main(int argc, char **argv)
 
 	in.rm_elf = load(pkg, "rm_elf.bin", &n_elf, 0);
 	in.rm_sig = load(pkg, "rm_sig.bin", &n_sig, 0);
-	in.bootloader = load(pkg, "bootloader.bin", &n_bl, GSP_GB10B_BOOTLOADER_SIZE);
-	in.fmc = load(pkg, "fmc.bin", &n_fmc, 0);
+	in.bootloader = load(pkg, "bootloader.bin", &n_bl, GSP_GB20B_BOOTLOADER_SIZE);
+	in.fmc = load(pkg, "fmc.bin", &n_fmc, GSP_GB20B_FMC_SIZE);
 	in.fmc_hash = load(pkg, "fmc_hash.bin", &n_h, GSP_COT_HASH_SIZE);
 	in.fmc_pubkey = load(pkg, "fmc_pkey.bin", &n_k, GSP_COT_KEY_SIZE);
 	in.fmc_sig = load(pkg, "fmc_sig.bin", &n_s, GSP_COT_SIG_SIZE);
@@ -159,9 +161,9 @@ int main(int argc, char **argv)
 	in.rm_sig_size = n_sig;
 	in.bootloader_size = n_bl;
 	in.fmc_size = n_fmc;
-	in.bl_code_off = GSP_GB10B_BL_CODE_OFF;
-	in.bl_data_off = GSP_GB10B_BL_DATA_OFF;
-	in.bl_manifest_off = GSP_GB10B_BL_MANIFEST_OFF;
+	in.bl_code_off = GSP_GB20B_BL_CODE_OFF;
+	in.bl_data_off = GSP_GB20B_BL_DATA_OFF;
+	in.bl_manifest_off = GSP_GB20B_BL_MANIFEST_OFF;
 
 	if (plan_only) {
 		/* host memory and stand-in device addresses below 40 bits */
@@ -178,8 +180,13 @@ int main(int argc, char **argv)
 		fd = open("/dev/aien-gpu", O_RDWR);
 		if (fd < 0 || ioctl(fd, AGPU_INFO, &info))
 			die(2, "NO-DEVICE", strerror(errno));
+		if (info.abi != AGPU_ABI_VERSION)
+			die(2, "ABI-MISMATCH", "module ABI version does not match aien-gpu-boot");
 		if (info.state != AGPU_STATE_BOUND || !info.fw_ok || !info.heap_bytes || !info.arena_bytes)
 			die(2, "NOT-READY", "module not in state BOUND with firmware, heap and arena");
+		/* the package and the start-up are GB20B's: architecture 0x1b, implementation 0xb */
+		if ((info.boot42 >> 20 & 0x3ff) != (GSP_GB20B_BOOT_42 >> 20 & 0x3ff))
+			die(2, "WRONG-CHIP", "PMC_BOOT_42 is not GB20B");
 		base = mmap(NULL, info.arena_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 		if (base == MAP_FAILED)
 			die(2, "NO-DEVICE", "mmap arena");
@@ -195,7 +202,57 @@ int main(int argc, char **argv)
 		if (!notify)
 			put64(si, 48, info.arena_iova);
 	}
+	/* Ground-truth GB20B GspSystemInfo deltas captured from live nvidia.ko 580.173.02 */
+	put32(si, 236, 0x59u); /* acpiMethodData.jtMethodData.status = NV_ERR_OBJECT_NOT_FOUND */
+	put32(si, 828, 0x59u); /* acpiMethodData.capsMethodData.status = NV_ERR_OBJECT_NOT_FOUND */
+	put32(si, 908, 1u);    /* bPreserveVideoMemoryAllocations = 1 */
+	{
+		struct timespec ts;
+		if (clock_gettime(CLOCK_REALTIME, &ts) == 0)
+			put64(si, 848, (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec);
+	}
+	static const gsp_reg_entry regs[37] = {
+		{ "GrdmaPciTopoCheckOverride", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "CreateImexChannel0", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "ImexChannelCount", GSP_REG_DWORD, 2048u, NULL, 0 },
+		{ "DmaRemapPeerMmio", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "OpenRmEnableUnsupportedGpus", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "EnableDbgBreakpoint", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "RmNvlinkBandwidthLinkCount", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "EnableGpuFirmwareLogs", GSP_REG_DWORD, 2u, NULL, 0 },
+		{ "EnableGpuFirmware", GSP_REG_DWORD, 18u, NULL, 0 },
+		{ "EnableResizableBar", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "EnablePCIERelaxedOrderingMode", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "RegisterPCIDriver", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "DynamicPowerManagementVideoMemoryThreshold", GSP_REG_DWORD, 200u, NULL, 0 },
+		{ "DynamicPowerManagement", GSP_REG_DWORD, 3u, NULL, 0 },
+		{ "S0ixPowerManagementVideoMemoryThreshold", GSP_REG_DWORD, 256u, NULL, 0 },
+		{ "EnableS0ixPowerManagement", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "PreserveVideoMemoryAllocations", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "RmProfilingAdminOnly", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "NvLinkDisable", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "EnableUserNUMAManagement", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "EnableStreamMemOPs", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "IgnoreMMIOCheck", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "VMallocHeapMaxSize", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "KMallocHeapMaxSize", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "MemoryPoolSize", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "EnablePCIeGen3", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "EnableMSI", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "UsePageAttributeTable", GSP_REG_DWORD, 0xffffffffu, NULL, 0 },
+		{ "InitializeSystemMemoryAllocations", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "DeviceFileMode", GSP_REG_DWORD, 438u, NULL, 0 },
+		{ "DeviceFileGID", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "DeviceFileUID", GSP_REG_DWORD, 0u, NULL, 0 },
+		{ "ModifyDeviceFiles", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "RmLogonRC", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "ResmanDebugLevel", GSP_REG_DWORD, 0xffffffffu, NULL, 0 },
+		{ "RMForcePcieConfigSave", GSP_REG_DWORD, 1u, NULL, 0 },
+		{ "RMSecBusResetEnable", GSP_REG_DWORD, 1u, NULL, 0 },
+	};
 	in.system_info = si;
+	in.regs = regs;
+	in.nregs = 37;
 	in.sysmem_heap_pa = info.heap_iova;
 	in.sysmem_heap_size = info.heap_bytes;
 	in.dma_bits = info.dma_bits;
@@ -204,8 +261,10 @@ int main(int argc, char **argv)
 	gsp_arena arena;
 	if (gsp_arena_init(&arena, base + GSP_PAGE, info.arena_iova + GSP_PAGE, info.arena_bytes - GSP_PAGE))
 		die(2, "BUILD-REFUSED", "arena not 4 KiB aligned");
-	if (gsp_boot_build(&arena, &in, &plan, &why))
+	if (gsp_boot_build_gb20b(&arena, &in, &plan, &crash, &why))
 		die(2, "BUILD-REFUSED", why);
+	/* evidence of what the chip is handed: GspFwWprMeta as built (256 bytes) */
+	out_bytes("wpr_meta.bin", base + GSP_PAGE + (plan.wpr_meta.pa - arena.pa), GSP_WPR_META_SIZE);
 	/* the COT packet goes into the arena right after the built blocks, where the module reads it */
 	cot_off = GSP_PAGE + ((arena.used + GSP_PAGE - 1) & ~(uint64_t)(GSP_PAGE - 1));
 	if (cot_off + GSP_EMEM_CHANNEL_SIZE > info.arena_bytes)
@@ -214,7 +273,7 @@ int main(int argc, char **argv)
 	out_bytes("cot_packet.bin", plan.cot_packet, plan.cot_packet_len);
 
 	memset(req.in, 0, sizeof(req.in));
-	put32(req.in, 0, 1);
+	put32(req.in, 0, AGPU_BOOT_VERSION);
 	put64(req.in, 8, cot_off);
 	put32(req.in, 16, plan.cot_packet_len);
 	put32(req.in, 20, app_version);
@@ -262,9 +321,11 @@ int main(int argc, char **argv)
 			out_bytes(name, buf, r.size);
 		free(buf);
 	}
-	printf("AIEN_GPU_BOOT: %s code=%u stage=%u polls=%u,%u,%u,%u sec2_mb0=%#x gsp_mb0=%#x cpuctl=%#x msgs=%u last_fn=%#x seq_runs=%u mmio_us=%llu wait_us=%llu\n",
-	       verdict_name(req.out.verdict), req.out.code, req.out.stage, req.out.polls[0], req.out.polls[1],
-	       req.out.polls[2], req.out.polls[3], req.out.sec2_mb0, req.out.gsp_mb0, req.out.cpuctl, req.out.msgs,
+	printf("AIEN_GPU_BOOT: %s code=%u stage=%u polls=%u,%u,%u,%u,%u sec2_err=%#x sec2_rsp=%u,%#x,%#x,%#x hwcfg2=%#x gsp_mb0=%#x cpuctl=%#x msgs=%u last_fn=%#x seq_runs=%u mmio_us=%llu wait_us=%llu\n",
+	       verdict_name(req.out.verdict), req.out.code, req.out.stage, req.out.polls0, req.out.polls[0],
+	       req.out.polls[1], req.out.polls[2], req.out.polls[3], req.out.sec2_err, req.out.sec2_rsp_bytes,
+	       req.out.sec2_rsp_hdr[0], req.out.sec2_rsp_hdr[1], req.out.sec2_rsp_cmd, req.out.hwcfg2,
+	       req.out.gsp_mb0, req.out.cpuctl, req.out.msgs,
 	       req.out.last_fn, req.out.seq_runs, (unsigned long long)req.out.mmio_us,
 	       (unsigned long long)req.out.wait_us);
 	return req.out.verdict == AGPU_BOOT_INIT_DONE ? 0 : 1;

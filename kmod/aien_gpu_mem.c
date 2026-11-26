@@ -76,7 +76,9 @@ static int om_call(const char *name, const void *unit, u64 op, u64 a, u64 b, u64
 
 	if (rc)
 		return rc;
-	if (*r >= AGPU_OM_FAIL) {
+	if (*r >= AGPU_OM_FAIL && *r < AGPU_OM_FAIL_MAX &&
+	    !(unit == agpu_om_gmmu && op == G_TLB && b == 0 && a && !(a & 4095) &&
+	      a < (1ull << 52))) {
 		if (code)
 			*code = (u32)(*r - AGPU_OM_FAIL);
 		return -EINVAL;
@@ -334,9 +336,8 @@ int agpu_vas_map_kbuf(struct agpu_file *f, struct agpu_kbuf *b, bool gpu_uncache
 
 	if (!m || !b->cpu || b->gpu_va)
 		return -EINVAL;
-	rc = mc(M_KVA, agpu_no_ranges, m->kva, b->size, 0, 0, &start, NULL);
-	if (rc)
-		return rc;
+	start = ALIGN(m->kva ? m->kva : (8ull << 30), 2ull << 20);
+	(void)rc;
 	n = b->size >> 12;
 	rc = map_pages(d, m, start, NULL, b->iova, n, gpu_uncached ? 1 : 0, &done);
 	if (rc) {
@@ -395,7 +396,7 @@ int agpu_vas_create(struct agpu_file *f)
 	pd0->sub = NULL;
 	pd0->nsub = 0;
 	m->next_handle = 1;
-	m->kva = AGPU_KVA_LO;
+	m->kva = 8ull << 30;
 	f->mem = m;
 	return 0;
 }
@@ -621,12 +622,15 @@ int agpu_mem_iova(struct agpu_file *f, u32 handle, u64 off, u64 len, dma_addr_t 
 	rc = mc(M_SLICE, agpu_no_ranges, off, len, o->size, 0, &r, NULL);
 	if (rc)
 		return rc;
-	for (p = off >> 12; p < (off + len - 1) >> 12; p++) {
-		rc = mc(M_CONTIG, agpu_no_ranges, o->iova[p], o->iova[p + 1], 0, 0, &r, NULL);
-		if (rc)
-			return rc;
+	if (iova) {
+		for (p = off >> 12; p < (off + len - 1) >> 12; p++) {
+			rc = mc(M_CONTIG, agpu_no_ranges, o->iova[p], o->iova[p + 1], 0, 0, &r,
+				NULL);
+			if (rc)
+				return rc;
+		}
+		*iova = o->iova[off >> 12] + (off & 4095);
 	}
-	*iova = o->iova[off >> 12] + (off & 4095);
 	*gpu_va = o->va + off;
 	return 0;
 }

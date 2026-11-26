@@ -28,11 +28,16 @@ static void test_ident(void)
 	CHECK(ident(V, 0x2e13, BAR, 0, 0, 0) == 2);
 	CHECK(ident(V, D, 4096, 0, 0, 0) == 3);
 	CHECK(ident(V, D, BAR, 0, 0, 2) == 4);
-	CHECK(ident(V, D, BAR, 0x1b0000a1, boot42(0x1a, 0xb, 0xa1), 1) == 0);	/* GB10B */
-	CHECK(ident(V, D, BAR, 0, boot42(0x1a, 0xb, 0), 1) == 5);
-	CHECK(ident(V, D, BAR, 0xffffffffu, boot42(0x1a, 0xb, 0), 1) == 5);
-	CHECK(ident(V, D, BAR, 1, boot42(0x1b, 0xb, 0), 1) == 6);		/* GB20B, not ours */
-	CHECK(ident(V, D, BAR, 1, boot42(0x1a, 0x0, 0), 1) == 7);		/* GB100 */
+	CHECK(ident(V, D, BAR, 0x1b0000a1, boot42(0x1a, 0xb, 0xa1), 1) == 6);	/* GB10B: another chip */
+	CHECK(ident(V, D, BAR, 0, boot42(0x1b, 0xb, 0), 1) == 5);
+	CHECK(ident(V, D, BAR, 0xffffffffu, boot42(0x1b, 0xb, 0), 1) == 5);
+	CHECK(ident(V, D, BAR, 1, boot42(0x1b, 0xb, 0), 1) == 0);		/* GB20B */
+	CHECK(ident(V, D, BAR, 0x1bb000a1u, 0x1bba1000u, 1) == 0);		/* Spark bare-metal GPUID.TXT */
+	CHECK(ident(V, D, BAR, 1, boot42(0x1c, 0xb, 0), 1) == 6);		/* unknown arch > 0x1b */
+	CHECK(ident(V, D, BAR, 1, boot42(0x19, 0xb, 0), 1) == 6);		/* unknown arch < 0x1a */
+	CHECK(ident(V, D, BAR, 1, boot42(0x1a, 0x0, 0), 1) == 6);		/* GB100 */
+	CHECK(ident(V, D, BAR, 1, boot42(0x1b, 0xc, 0), 1) == 7);		/* GB20C */
+	CHECK(ident(V, D, BAR, 1, boot42(0x1b, 0x0, 0), 1) == 7);		/* GB200 */
 	CHECK(ident(V, D, BAR, 1, 0xffffffffu, 1) == 6);
 }
 
@@ -44,7 +49,7 @@ static const uint64_t AIOVA = 0x80000000ull, ABYTES = 64ull << 20;
 static void good_boot(void)
 {
 	memset(blk, 0, sizeof(blk));
-	w32(0, 1);
+	w32(0, 2);
 	w64(8, 0x1000);		/* COT packet offset */
 	w32(16, 868);
 	w32(20, 0x5f3a1);
@@ -68,7 +73,9 @@ static void test_abi(void)
 {
 	good_boot(); CHECK(abi(1) == 0);
 	good_boot(); CHECK(abi(7) == 1);
-	good_boot(); w32(0, 2); CHECK(abi(1) == 2);
+	good_boot(); w32(0, 1); CHECK(abi(1) == 2);	/* the GB10B-era block version */
+	good_boot(); w32(0, 3); CHECK(abi(1) == 2);
+	good_boot(); w32(0, 0); CHECK(abi(1) == 2);
 	good_boot(); w32(16, 0); CHECK(abi(1) == 3);
 	good_boot(); w32(16, 1025); CHECK(abi(1) == 3);
 	good_boot(); w64(8, 0x1002); CHECK(abi(1) == 3);

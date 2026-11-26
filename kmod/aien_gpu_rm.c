@@ -64,8 +64,9 @@ struct agpu_rm {
 	u32 compute_class, gpfifo_class;
 	u32 next_client;
 	u64 chid_bm[64];			/* om/rmarg.om ChID bitmap of GR0's runlist */
-	struct agpu_kbuf pam, upam;		/* priv access maps (kgraphics_gm200.c:247-296) */
-	bool pam_init;				/* promoted with bInitialize once */
+	u32 gcb_bytes[7], gcb_align[7];
+	struct agpu_kbuf pam, upam, gcb[7];	/* priv access + global ctx bufs */
+	bool pam_init, gcb_init;		/* promoted with bInitialize once */
 	u64 a[64], b[64];			/* argument words of the Omega units */
 };
 
@@ -83,7 +84,7 @@ struct agpu_fctx {
 	u32 h_client, h_device, h_subdevice, h_vas, next;
 	u8 gsp;			/* 1 client, 2 device, 4 subdevice, 8 vaspace, 16 PDEs sent */
 	bool vas_tree, failed, pam_va_sent;
-	struct agpu_kbuf pam_map;	/* this file's mapping of the device priv access map */
+	struct agpu_kbuf pam_map, gcb_map[7];
 	struct agpu_chan *chan[RM_MAX_CHAN];
 };
 
@@ -103,7 +104,7 @@ static int om_one(const char *name, const void *unit, u64 a0, u64 a1, u64 a2, u6
 	*code = 0;
 	if (rc)
 		return rc;
-	if (*r >= AGPU_OM_FAIL) {
+	if (*r >= AGPU_OM_FAIL && *r < AGPU_OM_FAIL_MAX) {
 		*code = *r - AGPU_OM_FAIL;
 		return -EINVAL;
 	}
@@ -170,6 +171,13 @@ static int rm_rpc(struct agpu_dev *d, u64 op, u64 *a, u32 minpay, struct agpu_rm
 		}
 		if (rc == 0) {
 			if (ktime_after(ktime_get(), end)) {
+				u32 mb0 = d->bar0 ? ioread32(d->bar0 + 0x110040) : 0;
+				u32 mb1 = d->bar0 ? ioread32(d->bar0 + 0x110044) : 0;
+				u32 ctl = d->bar0 ? ioread32(d->bar0 + 0x111388) : 0;
+
+				dev_warn(&d->pdev->dev,
+					 "rpc timeout fn=%u seq=%u step=%u mb0=%#x mb1=%#x ctl=%#x\n",
+					 fn, seq, step, mb0, mb1, ctl);
 				st_set(st, AGPU_RM_E_TIMEOUT, 0, fn, step);
 				return -ETIMEDOUT;
 			}
@@ -198,6 +206,8 @@ static int rm_rpc(struct agpu_dev *d, u64 op, u64 *a, u32 minpay, struct agpu_rm
 			return -EIO;
 		}
 		/* r == 1: an event or another reply */
+		dev_info(&d->pdev->dev, "rpc rx event fn=%#llx (wait fn=%u step=%u)\n",
+			 b[8], fn, step);
 		if (b[8] == AGPU_EV_RUN_CPU_SEQUENCER) {
 			rc = agpu_seq_run(d, &code, &ops);
 			if (rc) {
@@ -262,6 +272,15 @@ static int rm_init_facts(struct agpu_dev *d, struct agpu_rm_status *st)
 	rm->patch_align = a[3];
 	rm->pam_bytes = a[4];
 	rm->pam_align = a[5];
+	{
+		const u8 *rx = d->msg_rx + 120;
+		int gi;
+
+		for (gi = 0; gi < 7; gi++) {
+			rm->gcb_bytes[gi] = le32_to_cpup((const __le32 *)(rx + (17 + gi) * 8));
+			rm->gcb_align[gi] = le32_to_cpup((const __le32 *)(rx + (17 + gi) * 8 + 4));
+		}
+	}
 	/* the device-info table, 32 entries per call, to GR0 or the end (kernel_fifo.c:2046) */
 	for (base = 0; base < 256; base += 32) {
 		rc = rm_ctl(d, rm->h_client, rm->h_subdevice, CTL_FIFO_DEVICE_INFO, 3212, base, st,
@@ -556,8 +575,22 @@ static int pam_get(struct agpu_dev *d, struct agpu_rm_status *st)
 	if (rc) {
 		agpu_kbuf_free(d, &rm->pam);
 		agpu_kbuf_free(d, &rm->upam);
+		return rc;
 	}
-	return rc;
+	{
+		int gi;
+
+		for (gi = 0; gi < 7; gi++) {
+			u32 al = rm->gcb_align[gi] ? rm->gcb_align[gi] : 4096;
+
+			if (!rm->gcb_bytes[gi] || rm->gcb[gi].cpu)
+				continue;
+			rc = kbuf_aligned(d, rm->gcb_bytes[gi], al, &rm->gcb[gi], st);
+			if (rc)
+				return rc;
+		}
+	}
+	return 0;
 }
 
 /*
@@ -612,6 +645,60 @@ static int promote(struct agpu_file *f, struct agpu_chan *c, struct agpu_rm_stat
 		return rc;
 	rm->pam_init = true;
 	fx->pam_va_sent = true;
+	{
+		int gi;
+
+		memset(a, 0, sizeof(rm->a));
+		a[0] = fx->h_client;
+		a[1] = fx->h_subdevice;
+		a[2] = c->h_chan;
+		e = a + 8;
+		n = 0;
+		for (gi = 0; gi < 4; gi++) {
+			if (!fx->gcb_map[gi].gpu_va)
+				continue;
+			e[0] = 0;
+			e[1] = fx->gcb_map[gi].gpu_va;
+			e[2] = 0;
+			e[4] = 3 + gi;
+			e[5] = 0;
+			e += 6;
+			n++;
+		}
+		if (n) {
+			a[3] = n;
+			rc = rm_rpc(d, B_PROMOTE, a, 40 + 560, st, S_COMPUTE);
+			if (rc)
+				return rc;
+		}
+		memset(a, 0, sizeof(rm->a));
+		a[0] = fx->h_client;
+		a[1] = fx->h_subdevice;
+		a[2] = c->h_chan;
+		e = a + 8;
+		n = 0;
+		for (gi = 4; gi < 7; gi++) {
+			/* GFXP_CTRL_BLK (8) & FECS_EVENT (9) */
+			bool init = (gi >= 5) && !rm->gcb_init;
+
+			if (!fx->gcb_map[gi].gpu_va)
+				continue;
+			e[0] = init ? rm->gcb[gi].iova : 0;
+			e[1] = fx->gcb_map[gi].gpu_va;
+			e[2] = init ? rm->gcb_bytes[gi] : 0;
+			e[4] = 3 + gi;
+			e[5] = init ? 1 : 0;
+			e += 6;
+			n++;
+		}
+		if (n) {
+			a[3] = n;
+			rc = rm_rpc(d, B_PROMOTE, a, 40 + 560, st, S_COMPUTE);
+			if (rc)
+				return rc;
+		}
+		rm->gcb_init = true;
+	}
 	return 0;
 }
 
@@ -630,13 +717,27 @@ static int chan_buffers(struct agpu_file *f, struct agpu_chan *c, struct agpu_rm
 	     pam_get(d, st);
 	if (rc)
 		return rc;
-	rc = agpu_vas_map_kbuf(f, &c->main, false) ?: agpu_vas_map_kbuf(f, &c->patch, false);
+	/* GB20B GR ctx buffers are GPU-uncached (bOverrideContextBuffersToGpuCached=false). */
+	rc = agpu_vas_map_kbuf(f, &c->main, true) ?: agpu_vas_map_kbuf(f, &c->patch, true);
 	if (!rc && rm->pam.cpu && !fx->pam_map.gpu_va) {
 		fx->pam_map = rm->pam;
 		fx->pam_map.gpu_va = 0;
-		rc = agpu_vas_map_kbuf(f, &fx->pam_map, false);
+		rc = agpu_vas_map_kbuf(f, &fx->pam_map, true);
 		if (rc)
 			memset(&fx->pam_map, 0, sizeof(fx->pam_map));
+	}
+	{
+		int gi;
+
+		for (gi = 0; !rc && gi < 7; gi++) {
+			if (!rm->gcb[gi].cpu || fx->gcb_map[gi].gpu_va)
+				continue;
+			fx->gcb_map[gi] = rm->gcb[gi];
+			fx->gcb_map[gi].gpu_va = 0;
+			rc = agpu_vas_map_kbuf(f, &fx->gcb_map[gi], true);
+			if (rc)
+				memset(&fx->gcb_map[gi], 0, sizeof(fx->gcb_map[gi]));
+		}
 	}
 	if (rc)
 		st_set(st, rc == -ENOMEM ? AGPU_RM_E_NOMEM : AGPU_RM_E_STATE, -rc, 0, S_COMPUTE);
@@ -661,7 +762,7 @@ static int chan_alloc(struct agpu_file *f, struct agpu_chan *c, struct agpu_chan
 	a[6] = in->entries;
 	a[7] = c->chid;
 	a[8] = c->h_ctx;
-	a[9] = fx->h_vas;
+	a[9] = 0;		/* TSG + ctxshare: hVASpace must be 0 */
 	a[10] = c->userd_handle;
 	a[11] = in->userd_off;
 	a[12] = c->inst.iova;
@@ -688,7 +789,7 @@ static int chan_build(struct agpu_file *f, struct agpu_chan *c, struct agpu_chan
 	u32 code;
 	int rc;
 
-	rc = agpu_mem_iova(f, in->ring_handle, in->ring_off, (u64)in->entries * 8, &iova[0],
+	rc = agpu_mem_iova(f, in->ring_handle, in->ring_off, (u64)in->entries * 8, NULL,
 			   &gva[0]) ?:
 	     agpu_mem_iova(f, in->userd_handle, in->userd_off, 512, &iova[1], &gva[1]) ?:
 	     agpu_mem_iova(f, in->err_handle, 0, RM_ERR_BYTES, &iova[2], &gva[2]);
@@ -707,7 +808,7 @@ static int chan_build(struct agpu_file *f, struct agpu_chan *c, struct agpu_chan
 	rc = chan_buffers(f, c, st);
 	if (rc)
 		return rc;
-	/* 2.8 TSG, then its fault-method buffers (one per runqueue, 2 on GB10B) */
+	/* 2.8 TSG, then its fault-method buffers (one per runqueue, 2 on GB10B and GB20B) */
 	rc = rm_alloc4(d, B_TSG, fx->h_client, fx->h_device, c->h_tsg, fx->h_vas, st, S_TSG);
 	if (rc)
 		return rc;
@@ -730,6 +831,23 @@ static int chan_build(struct agpu_file *f, struct agpu_chan *c, struct agpu_chan
 	rc = chan_alloc(f, c, in, iova, gva[0], st);
 	if (rc)
 		return rc;
+	{
+		u32 *iw = (u32 *)c->inst.cpu;
+		u64 root = agpu_vas_root_iova(f);
+		u32 old_sc = iw[0x2a0 / 4];
+
+		if (root && (old_sc & 0xfffu) != 1u) {
+			WRITE_ONCE(iw[0x2a0 / 4], (u32)(root & ~0xfffu) | (old_sc & 0xfffu));
+			WRITE_ONCE(iw[0x2a4 / 4], (u32)(root >> 32));
+			dma_wmb();
+			dev_info(&d->pdev->dev, "sc_pdb0 patched: %#x:%#x (was %#x)\n",
+				 iw[0x2a0 / 4], iw[0x2a4 / 4], old_sc);
+		}
+		dev_info(&d->pdev->dev,
+			 "chan_alloc inst=%pad pdb=%#x:%#x main=%#llx patch=%#llx pam=%#llx\n",
+			 &c->inst.iova, iw[0x200 / 4], iw[0x204 / 4],
+			 c->main.gpu_va, c->patch.gpu_va, fx->pam_map.gpu_va);
+	}
 	c->gsp |= 4;
 	rc = agpu_mem_hold(f, c->ring_handle, 1) ?: agpu_mem_hold(f, c->userd_handle, 1) ?:
 	     agpu_mem_hold(f, c->err_handle, 1);
@@ -742,10 +860,25 @@ static int chan_build(struct agpu_file *f, struct agpu_chan *c, struct agpu_chan
 	rc = promote(f, c, st);
 	if (rc)
 		return rc;
+	dev_info(&d->pdev->dev, "post-promote fault_st=%#x fault_put=%#x\n",
+		 ioread32(d->bar0 + 0xb83094), ioread32(d->bar0 + 0xb8300c));
 	rc = rm_alloc4(d, B_COMPUTE, fx->h_client, c->h_chan, c->h_obj, rm->compute_class, st,
 		       S_COMPUTE);
-	if (rc)
+	if (rc) {
+		const u32 *iw = (const u32 *)c->inst.cpu;
+		const u32 *mp = (const u32 *)c->main.cpu;
+		size_t mi, mnz = 0;
+
+		for (mi = 0; mi < c->main.size / 4; mi++) {
+			if (mp[mi])
+				mnz++;
+		}
+		dev_warn(&d->pdev->dev,
+			 "compute fail: main_nz=%zu pdb=%#x sc0=%#x fault=%#x put=%#x\n",
+			 mnz, iw[0x200 / 4], iw[0x2a0 / 4],
+			 ioread32(d->bar0 + 0xb83094), ioread32(d->bar0 + 0xb8300c));
 		return rc;
+	}
 	c->gsp |= 8;
 	/* 2.12: the token on the CPU; 2.14: schedule the TSG */
 	a[0] = rm->runlist;
@@ -887,6 +1020,8 @@ void agpu_rm_file_release(struct agpu_file *f)
 			stuck |= !!fx->chan[i];
 	}
 	agpu_vas_unmap_kbuf(f, &fx->pam_map);
+	for (i = 0; i < 7; i++)
+		agpu_vas_unmap_kbuf(f, &fx->gcb_map[i]);
 	if (fx->vas_tree) {
 		if (stuck)
 			agpu_vas_abandon(f);
@@ -947,6 +1082,8 @@ void agpu_rm_unload(struct agpu_dev *d)
 	if (d->rm && !d->touched) {
 		agpu_kbuf_free(d, &d->rm->pam);
 		agpu_kbuf_free(d, &d->rm->upam);
+		for (i = 0; i < 7; i++)
+			agpu_kbuf_free(d, &d->rm->gcb[i]);
 	}
 	kfree(d->rm);
 	d->rm = NULL;

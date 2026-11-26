@@ -1,8 +1,19 @@
 # The hardware window for aien-gpu.ko
 
-Status: READY TO RUN once stage C's tools build (`make tools`); NOT_RUN. Needs Drake's explicit
-authorization for an exclusive GPU window: it stops the live 35B on 18091 and unloads NVIDIA's driver.
-One window attempts the whole path; any failed stage stops the stages and rolls back.
+Status: **`run.sh go` is DISABLED (2026-11-18).** This procedure unloads NVIDIA's driver and loads
+ours on the same boot. That was tried once on the chip (2026-11-18T23:09Z, with the GB10B start-up):
+our start-up stopped with the suspended marker 0x80000000 in the GSP's MAILBOX0, and afterwards
+nvidia.ko did not re-initialise the chip (`ksec2SendBootCommands_GB20B: SEC2 boot cmds failed`,
+then `Timed out waiting for SEC2 command queue to be empty`), so the machine had to restart
+(`docs/evidence/hot-20261118T2309Z-kernel.txt`). One run does not show that a hot start can never
+work; it is not tried again here. The chip must be cold: booted with nvidia held
+back, our module loaded first, and a clean restart as the way back to nvidia.ko. A sysfs PCIe FLR on
+000f:01:00.0 is not a way back: it reset the whole Spark (2026-11-18T23:15:09Z). `run.sh check` still
+works and changes nothing. The cold-boot procedure is not written in this repository yet; the one
+cold run so far is recorded in `~/handoffs/L332/window0-20261118T234217Z` (stage A PASS, stage B
+stopped with the GB10B start-up and package). The steps below describe the disabled hot-swap path and
+stay as the record of what each stage proves. Any run on the chip needs Drake's explicit
+authorization.
 
 ## How to run
 
@@ -31,7 +42,7 @@ window/after-reboot.sh <evidence dir> --cudapp-m16 <same binary>
 | W5 | `sysctl kernel.panic=10 panic_on_oops=1` (old values saved) | an oops in our module reboots the box instead of freezing it | rollback |
 | W6 | `rmmod nvidia_drm nvidia_modeset nvidia_uvm nvidia`, 60 s each | NVIDIA's kernel code is gone from the GPU; time to unload | reboot path (L158: modeset's kthread may block the unload) |
 | W7 stage A | `insmod aien_gpu.ko allow_bind=1 arena_mib=96 heap_mib=512`; dmesg `omega self-test PASS`, `bound: BOOT_0 ..`; `aien-gpu-boot --info` state 1, fw_ok 1 | our module binds the GB10 and reads its identity with Omega deciding; firmware pin | rollback |
-| W8 stage B | `aien-gpu-boot --pkg ..` (AGPU_BOOT): 11 register steps by om/boot.om, status queue until INIT_DONE with sequencer requests; GSP logs copied out | GSP-RM started by our code, no NVIDIA kernel code | rollback (GPU may need a reset) |
+| W8 stage B | `aien-gpu-boot --pkg ..` (AGPU_BOOT): 12 register steps by om/boot.om, status queue until INIT_DONE with sequencer requests; GSP logs copied out | GSP-RM started by our code, no NVIDIA kernel code | rollback (GPU may need a reset) |
 | W9 stage C | `aien-gpu-m16 --rm-init` (AGPU_RM_INIT, static info saved), then `aien-gpu-m16` (negative control: no doorbell, marker stays 0 for 100 ms; then doorbell, marker 0x16c0ffee) | a CUDA++ m16 gate runs through our driver only | rollback |
 | R1 | `rmmod aien_gpu` (UNLOADING_GUEST_DRIVER, halt wait) | clean unload | reboot path |
 | R2 | `modprobe nvidia nvidia_uvm nvidia_modeset nvidia_drm`; `nvidia-smi -L` within 60 s | NVIDIA's driver re-boots the GPU after ours | reboot path |

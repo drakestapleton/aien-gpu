@@ -43,7 +43,7 @@
 #include "ctrl/ctrl2080/ctrl2080internal.h"
 #include "ctrl/ctrla06c.h"
 #include "ctrl/ctrl90f1.h"
-#include "swref/published/blackwell/gb100/dev_vm.h"
+#include "swref/published/blackwell/gb202/dev_vm.h" /* the doorbell layout GB20B takes */
 
 extern const char agpu_om_rm[], agpu_om_rmchan[], agpu_om_rmctl[], agpu_om_rmchk[], agpu_om_rmarg[];
 
@@ -658,10 +658,15 @@ static void test_replies(void)
 	eq("devinfo none", chk(4), 0);
 	eq("devinfo none found", a[0], 0);
 	di.entries[6].engineData[12] = 1;
-	di.entries[6].engineData[3] = 64;
+	di.entries[6].engineData[3] = 127;
 	memcpy(msg + 120, &di, sizeof(di));
 	a[6] = 32;
-	eq("devinfo runlist 64", chk(4), FAIL + 7);
+	eq("devinfo runlist 127", chk(4), 0);
+	eq("devinfo runlist 127 value", a[1], 127);
+	di.entries[6].engineData[3] = 128;
+	memcpy(msg + 120, &di, sizeof(di));
+	a[6] = 32;
+	eq("devinfo runlist 128", chk(4), FAIL + 7);
 	di.entries[6].engineData[3] = 12;
 	di.numEntries = 33;
 	memcpy(msg + 120, &di, sizeof(di));
@@ -844,15 +849,19 @@ static void test_args(void)
 	eq("args handle 0", arg(3), FAIL + 7);
 	a[5] = 1ull << 32;
 	eq("args handle 33 bits", arg(3), FAIL + 7);
-	/* token: DOORBELL RUNLIST_ID 22:16, VECTOR 11:0 (gb100/dev_vm.h:620-625) */
-	static const uint32_t tok[][2] = { { 0, 0 }, { 12, 5 }, { 63, 4095 }, { 1, 2048 } };
+	/* token as kfifoGenerateWorkSubmitTokenHal_GB202 builds it: DOORBELL RUNLIST_ID 22:16, VECTOR
+	 * 11:0, RUNLIST_DOORBELL 30:30 ENABLE (gb202/dev_vm.h:27-32) */
+	static const uint32_t tok[][2] = { { 0, 0 }, { 12, 5 }, { 63, 4095 }, { 1, 2048 }, { 64, 0 }, { 127, 7 } };
 	for (unsigned i = 0; i < sizeof(tok) / sizeof(tok[0]); i++) {
 		set4(tok[i][0], tok[i][1], 0, 0);
 		eq("token", arg(4), DRF_NUM(_VIRTUAL, _FUNCTION_DOORBELL, _RUNLIST_ID, tok[i][0]) |
-				    DRF_NUM(_VIRTUAL, _FUNCTION_DOORBELL, _VECTOR, tok[i][1]));
+				    DRF_NUM(_VIRTUAL, _FUNCTION_DOORBELL, _VECTOR, tok[i][1]) |
+				    DRF_DEF(_VIRTUAL, _FUNCTION_DOORBELL, _RUNLIST_DOORBELL, _ENABLE));
 	}
-	set4(64, 0, 0, 0);
-	eq("token runlist 64", arg(4), FAIL + 8);
+	set4(12, 5, 0, 0);
+	eq("token bit 30", arg(4) >> 30, 1);
+	set4(128, 0, 0, 0);
+	eq("token runlist 128", arg(4), FAIL + 8);
 	set4(0, 4096, 0, 0);
 	eq("token chid 4096", arg(4), FAIL + 8);
 	/* unload waits */

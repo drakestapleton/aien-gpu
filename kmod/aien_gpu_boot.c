@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR GPL-2.0-only
 /*
- * aien_gpu_boot.c -- stage B: start NVIDIA's signed GSP-RM on the GB10 with our code, then wait
- * for it to report INIT_DONE, running any CPU-sequencer request it sends on the way.
+ * aien_gpu_boot.c -- stage B: start NVIDIA's signed GSP-RM on the GB10 (chip GB20B) with our code,
+ * then wait for it to report INIT_DONE, running any CPU-sequencer request it sends on the way.
  * The boot package (GSP-RM image, radix3, WPR metadata, FMC arguments, the SEC2 COT packet,
  * queues) is built into the arena by user space (tools/aien-gpu-boot) before this call;
  * om/abi.om checks the block that describes it. om/boot.om decides every register access of the
- * 11 start-up steps; this file performs them on BAR0 one at a time. One attempt per module load:
+ * 12 start-up steps; this file performs them on BAR0 one at a time. One attempt per module load:
  * a failed start-up is never retried without a reset.
  */
 #include <linux/io.h>
@@ -28,7 +28,7 @@ static u64 blk64(const u8 *b, unsigned int o)
 }
 
 /*
- * The 11 register steps. Returns 0 when om/boot.om finished (stage in st[12]), negative on a
+ * The 12 register steps. Returns 0 when om/boot.om finished (stage in st[12]), negative on a
  * trap.
  */
 static int agpu_boot_mmio(struct agpu_dev *d, const u8 *in, struct agpu_boot_out *o)
@@ -51,7 +51,8 @@ static int agpu_boot_mmio(struct agpu_dev *d, const u8 *in, struct agpu_boot_out
 	 * om/boot.om bounds every wait by its budget; this cap only guards the glue against a
 	 * defect
 	 */
-	cap = 4096 + 4ull * (st[4] + st[5] + st[6] + st[7] + 4);
+	/* budget 4 serves steps 0 and 1; the reply read is at most 256 dwords, two calls each */
+	cap = 8192 + 4ull * (2 * st[4] + st[5] + st[6] + st[7] + 4);
 	for (;;) {
 		rc = agpu_om("boot", agpu_om_boot, (u64)st, (u64)pkt, obs, (u64)act, 0, 0, &r);
 		if (rc)
@@ -78,8 +79,13 @@ static int agpu_boot_mmio(struct agpu_dev *d, const u8 *in, struct agpu_boot_out
 		o->polls[i] = st[13 + i];
 	o->dwords = st[17];
 	o->ememc_after = st[18];
-	o->sec2_mb0 = st[19];
-	o->sec2_mb1 = st[20];
+	o->code = st[31];
+	o->sec2_err = st[19];
+	o->sec2_rsp_bytes = st[20];
+	o->polls0 = st[25];
+	o->sec2_rsp_hdr[0] = st[28];
+	o->sec2_rsp_hdr[1] = st[29];
+	o->sec2_rsp_cmd = st[26];
 	o->hwcfg2 = st[21];
 	o->gsp_mb0 = st[22];
 	o->gsp_mb1 = st[23];
@@ -91,16 +97,31 @@ static int agpu_boot_mmio(struct agpu_dev *d, const u8 *in, struct agpu_boot_out
 static void agpu_boot_wait(struct agpu_dev *d, u32 wait_ms, struct agpu_boot_out *o)
 {
 	ktime_t end = ktime_add_ms(ktime_get(), wait_ms);
+	bool linked = false;
 	u32 code;
 	int rc;
 
 	for (;;) {
 		rc = agpu_mq_recv(d, &code);
 		if (rc < 0) {
+			/*
+			 * GSP-RM writes the status-queue header after RISC-V starts
+			 * (message_queue_cpu.c:346-356 retries msgqRxLink until timeout).
+			 * Retry header-shape refusal (code 1) until the queue is linked.
+			 */
+			if (!linked && code == 1) {
+				if (ktime_after(ktime_get(), end)) {
+					o->verdict = AGPU_BOOT_TIMEOUT;
+					return;
+				}
+				usleep_range(100, 200);
+				continue;
+			}
 			o->verdict = AGPU_BOOT_QUEUE_ERROR;
 			o->code = code;
 			return;
 		}
+		linked = true;
 		if (rc == 0) {
 			if (ktime_after(ktime_get(), end)) {
 				o->verdict = AGPU_BOOT_TIMEOUT;
@@ -113,6 +134,13 @@ static void agpu_boot_wait(struct agpu_dev *d, u32 wait_ms, struct agpu_boot_out
 		o->last_fn = blk32(d->msg_rx, 60);
 		o->rx_seq = d->rx_seq;
 		if (o->last_fn == AGPU_EV_INIT_DONE) {
+			u32 res = blk32(d->msg_rx, 64);
+
+			if (res) {
+				o->verdict = AGPU_BOOT_QUEUE_ERROR;
+				o->code = res;
+				return;
+			}
 			o->verdict = AGPU_BOOT_INIT_DONE;
 			return;
 		}
@@ -160,7 +188,8 @@ void agpu_boot(struct agpu_dev *d, struct agpu_boot *b)
 	o->mmio_us = ktime_us_delta(ktime_get(), t0);
 	if (rc || o->stage) {
 		o->verdict = AGPU_BOOT_MMIO_STOPPED;
-		o->code = rc ? 99 : 0;
+		if (rc)
+			o->code = 99;
 		d->info.state = AGPU_STATE_FAILED;
 		goto out;
 	}

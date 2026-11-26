@@ -19,8 +19,8 @@ note op 4 FIFO_GET_DEVICE_INFO_TABLE reply (3212 bytes at 120: baseIndex @0, num
 note   entries[32] @12, 100 bytes each, engineData[16] @0): looks for GR0, engineData[2] (RM_ENGINE_TYPE)
 note   = 1 with engineData[12] (IS_HOST_DRIVEN_ENGINE) != 0 (engine_info.h:37-99). a6 = baseIndex sent.
 note   Out a0 found, a1 runlist (engineData[3]), a2 bMore, a3 numEntries, a4 CHRAM_PRI_BASE [14],
-note   a5 RUNLIST_PRI_BASE [11]. Refusal 6 numEntries > 32 or baseIndex not echoed, 7 runlist above 63
-note   (doorbell RUNLIST_ID 22:16 with bit 22 = RUNLIST_DOORBELL_DISABLE, gb100/dev_vm.h:620-625).
+note   a5 RUNLIST_PRI_BASE [11]. Refusal 6 numEntries > 32 or baseIndex not echoed, 7 runlist above 127
+note   (doorbell RUNLIST_ID 22:16 is 7 bits on GB20B, gb202/dev_vm.h:29; om/rmarg.om op 4 builds the token).
 note op 5 INTERNAL_FIFO_GET_NUM_CHANNELS reply {runlistId, numChannels}: a0 runlist sent; refusal 8 when
 note   runlistId is not echoed or numChannels is not 1..4096 (ChID VECTOR 11:0). Out a1 numChannels.
 note op 6 CE_GET_FAULT_METHOD_BUFFER_SIZE reply {size}: refusal 9 unless 1..16777216. Out a0 size.
@@ -35,7 +35,7 @@ note   + 4; refusal 11 unless 1..64. Out a0.
 note op 9 GPU_GET_CLASSLIST_V2 reply {numClasses, classList[200]}: refusal 6 numClasses > 200, 12 no
 note   known compute or GPFIFO class. Out a0 compute class (0xcec0 BLACKWELL_COMPUTE_B, else 0xcdc0
 note   BLACKWELL_COMPUTE_A), a1 GPFIFO class (0xca6f BLACKWELL_CHANNEL_GPFIFO_B, else 0xc96f _A).
-note Decimal constants (Wolfram): 52928 = 0xcec0, 52672 = 0xcdc0, 51823 = 0xca6f, 51567 = 0xc96f,
+note Decimal constants (aien-calc receipts in docs/calc-receipts, listed in docs/STATUS.md): 52928 = 0xcec0, 52672 = 0xcdc0, 51823 = 0xca6f, 51567 = 0xc96f,
 note 67108864 = 64 MiB, 16777216 = 16 MiB, 2097152 = 2 MiB.
 fn r32 m view uchar 65536 o ulong to ulong
 x = or ulong get m o shl ulong get m add o 1 8
@@ -118,7 +118,7 @@ put a 0 1
 put a 1 ed m i 3
 put a 4 ed m i 14
 put a 5 ed m i 11
-if gt get a 1 63
+if gt get a 1 127
 ret 1000007
 end
 ret 0
