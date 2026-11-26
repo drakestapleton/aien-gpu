@@ -103,7 +103,7 @@ static int om_one(const char *name, const void *unit, u64 a0, u64 a1, u64 a2, u6
 	*code = 0;
 	if (rc)
 		return rc;
-	if (*r >= AGPU_OM_FAIL) {
+	if (*r >= AGPU_OM_FAIL && *r < AGPU_OM_FAIL_MAX) {
 		*code = *r - AGPU_OM_FAIL;
 		return -EINVAL;
 	}
@@ -661,7 +661,7 @@ static int chan_alloc(struct agpu_file *f, struct agpu_chan *c, struct agpu_chan
 	a[6] = in->entries;
 	a[7] = c->chid;
 	a[8] = c->h_ctx;
-	a[9] = fx->h_vas;
+	a[9] = 0;		/* TSG + ctxshare: hVASpace must be 0 */
 	a[10] = c->userd_handle;
 	a[11] = in->userd_off;
 	a[12] = c->inst.iova;
