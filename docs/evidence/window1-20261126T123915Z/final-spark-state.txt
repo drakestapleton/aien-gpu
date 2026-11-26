@@ -1,0 +1,14 @@
+--- lsmod (nvidia|aien) ---
+aien_gpu              110592  0
+--- /dev/nvidia* ---
+ls: cannot access '/dev/nvidia*': No such file or directory
+--- /dev/aien-gpu ---
+crw-rw---- 1 root drakestapleton 10, 265 Nov 26 06:39 /dev/aien-gpu
+--- dmesg aien_gpu / MMU faults ---
+--- seed_d2048_8x4.ck stat ---
+-rw-r--r-- 1 drakestapleton drakestapleton 6650904720 Nov 26 04:22 /home/drakestapleton/work/helix-35b-overnight-20261125/bundles/seed_d2048_8x4.ck
+--- sudo dmesg aien_gpu / MMU faults ---
+[    0.106273] iommu: Default domain type: Translated (set via kernel command line)
+[   92.395403] aien_gpu: module verification failed: signature and/or required key missing - tainting kernel
+--- fault count ---
+1

@@ -1,0 +1,14 @@
+=== 1. Build pure-Omega aienos-helix runtime (allen/base + allen/runtime + aienos_helix) ===
+built /home/drakestapleton/work/aienux-pure-omega/native/omega/helix/build/aienos-helix (16440 bytes, sha256=10799e52bac340688e07bb8a67ad5356331b3d72cf10b887c311f6ff9b1c322b)
+=== 2. Negative control: empty prompt MUST be refused by Allen before touching GPU ===
+AIENOS_HELIX_REFUSED reason=allen_admission (rc=2)
+=== 3. Positive live turn on GB20B /dev/aien-gpu (D=2048 8x4 read-only, ZERO nvidia.ko) ===
+AIENOS_HELIX_TURN: PASS seq=1 hist=2 active=0 driver=/dev/aien-gpu nvidia_absent=1 ms=32545 out_bytes=31
+AIENOS_HELIX_PROMPT: fn solve a ulong to ulong
+AIENOS_HELIX_ANSWER: if lt a 4 ret 6 end ret 6 end
+=== 4. Build & QEMU-boot pure-Omega AArch64 EFI image (build/ only, ZERO host firmware touches) ===
+built /home/drakestapleton/work/aienux-pure-omega/native/omega/helix/build/AIENOS-HELIX-AA64.EFI (38912 bytes, sha256=e9f79bbca5dbe5a3fd1b8a5cccfbc2916cac3c55a585f8a40dc73fb59c5fe27a)
+/home/drakestapleton/work/aienux-pure-omega/native/omega/helix/build/AIENOS-HELIX-AA64.EFI: PE32+ executable (EFI application) Aarch64, for MS Windows, 2 sections
+AIENOS_EFI_HELIX_AA64: PASS gpu_units=ident+gmmu+gb20b_policy allen_seq=1 allen_hist=2
+qemu_a64efi_rc=0
+AIENOS_OMEGA_HELIX_GATE: PASS live_gpu=PASS a64efi=QEMU_PASS

@@ -1,0 +1,1 @@
+AIEN_GPU_INFO: abi=1 state=1 boot0=0x1bb000a1 boot42=0x1bba1000 bar0=67108864 fw_bytes=75012080 fw_ok=1 arena=0x6000000@0xf8000000 heap=0x20000000@0xc0000000 dma_bits=40 boot_attempts=0

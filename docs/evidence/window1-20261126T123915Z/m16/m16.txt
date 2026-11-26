@@ -1,0 +1,11 @@
+tool=aien-gpu-m16 device=/dev/aien-gpu wait_ms=2000 pid=139875
+info abi=1 state=4 boot0=0x1bb000a1 boot42=0x1bba1000
+mem.fifo handle=1 va=0x4000000000 size=0x10000 flags=1 mmap_off=0x21000000000
+mem.pushbuffer handle=2 va=0x4000011000 size=0x1000 flags=1 mmap_off=0x22000000000
+mem.marker handle=3 va=0x4000013000 size=0x1000 flags=1 mmap_off=0x23000000000
+mem.notifier handle=4 va=0x4000015000 size=0x1000 flags=1 mmap_off=0x24000000000
+chan_create ioctl=0 verdict=1 code=0 fn=0 step=0 chid=0 token=0x40000000 channel=1 compute_class=0xcec0 doorbell_off=0x10000000000
+negative_control marker_after_100ms=0x00000000
+positive marker=0x16c0ffee after_us=109
+libcuda_mapped=0
+verdict=PASS marker=0x16c0ffee chid=0 token=0x40000000 class=0xcec0

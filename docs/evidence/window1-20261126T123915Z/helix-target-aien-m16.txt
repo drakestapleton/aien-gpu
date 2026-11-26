@@ -1,0 +1,2 @@
+built /home/drakestapleton/work/helix-nvfp4-live/build/aien-m16-om (15960 bytes, target=aien-m16, omc=/home/drakestapleton/canon/omega-mv/seed/out/omc)
+AIEN_GPU_M16_OM: PASS marker=0x16c0ffee chid=0 token=0x40000000 class=0x0000cec0 neg_ctrl=0

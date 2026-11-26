@@ -1,0 +1,30 @@
+[   94.267437] aien-gpu 000f:01:00.0: chan_alloc inst=0x00000000bffe3000 pdb=0xbfffe807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[   94.281784] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  125.068324] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0xbffccc07:0x0 (was 0xc288ac07)
+[  125.068338] aien-gpu 000f:01:00.0: chan_alloc inst=0x00000000bffb4000 pdb=0xbffcc807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[  125.072819] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  125.124419] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0xbee88c07:0x0 (was 0xc288ac07)
+[  125.124429] aien-gpu 000f:01:00.0: chan_alloc inst=0x00000000beea0000 pdb=0xbee88807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[  125.129323] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  125.357634] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0xbffccc07:0x0 (was 0xc288ac07)
+[  125.357646] aien-gpu 000f:01:00.0: chan_alloc inst=0x00000000be23c000 pdb=0xbffcc807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[  125.362837] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  128.545295] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0x9b99dc07:0x0 (was 0xc288ac07)
+[  128.545306] aien-gpu 000f:01:00.0: chan_alloc inst=0x000000009b9b5000 pdb=0x9b99d807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[  128.550493] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  129.527143] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0x9e509c07:0x0 (was 0xc288ac07)
+[  129.527154] aien-gpu 000f:01:00.0: chan_alloc inst=0x00000000be260000 pdb=0x9e509807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[  129.532308] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  173.641108] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0xbec76c07:0x0 (was 0xc288ac07)
+[  173.641123] aien-gpu 000f:01:00.0: chan_alloc inst=0x00000000bec5e000 pdb=0xbec76807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[  173.646233] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  194.999216] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0xbec76c07:0x0 (was 0xc288ac07)
+[  194.999229] aien-gpu 000f:01:00.0: chan_alloc inst=0x00000000bfdf3000 pdb=0xbec76807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[  195.004150] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  195.358875] aien-gpu 000f:01:00.0: Using 40-bit DMA addresses
+[  262.511248] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0x9e504c07:0x0 (was 0xc288ac07)
+[  262.511262] aien-gpu 000f:01:00.0: chan_alloc inst=0x00000000beec0000 pdb=0x9e504807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[  262.515432] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  266.002262] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0x3dfb6c07:0xfd (was 0xc288ac07)
+[  266.002276] aien-gpu 000f:01:00.0: chan_alloc inst=0x000000fd3dfce000 pdb=0x3dfb6807:0xfd main=0x200000000 patch=0x200200000 pam=0x200400000
+[  266.007279] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0

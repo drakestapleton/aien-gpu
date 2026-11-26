@@ -1,0 +1,36 @@
+[    0.000674] pid_max: default: 32768 minimum: 301
+[    0.017786] SVE: default vector length 16 bytes per vector
+[    0.106273] iommu: Default domain type: Translated (set via kernel command line)
+[    0.109470] NetLabel:  unlabeled traffic allowed by default
+[    0.163753] PCI: CLS 0 bytes, default 64
+[    1.213178] nvme nvme0: 15/0/0 default/read/poll queues
+[    5.554354] systemd[1]: systemd 255.4-1ubuntu8.18 running in system mode (+PAM +AUDIT +SELINUX +APPARMOR +IMA +SMACK +SECCOMP +GCRYPT -GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 -IDN +IPTC +KMOD +LIBCRYPTSETUP +LIBFDISK +PCRE2 -PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD -BPF_FRAMEWORK -XKBCOMMON +UTMP +SYSVINIT default-hierarchy=unified)
+[    5.805591] systemd[1]: Queued start job for default target multi-user.target.
+[    6.400024] bridge: filtering via arp/ip/ip6tables is no longer available by default. Update your scripts to load br_netfilter if you need this.
+[   34.949644] audit: type=1400 audit(1795696697.119:181): apparmor="STATUS" operation="profile_load" profile="unconfined" name="docker-default" pid=5404 comm="apparmor_parser"
+[   92.395403] aien_gpu: module verification failed: signature and/or required key missing - tainting kernel
+[   92.401718] aien-gpu: omega self-test PASS units=7
+[   92.402158] aien-gpu 000f:01:00.0: MSI-X enabled: 9 vectors
+[   92.534758] aien-gpu 000f:01:00.0: firmware nvidia/580.173.02/gsp_ga10x.bin 75012080 bytes sha256 32cb7cf3e77f97e92f6e92135939ccb3ba382748144569c0dfccf3338d43d963 matches the pin
+[   92.547598] aien-gpu 000f:01:00.0: sysmem flush buffer programmed at 0x00000000bffff000 (lo=0xbffff000 hi=0x0)
+[   92.547690] aien-gpu 000f:01:00.0: bound: BOOT_0 1bb000a1 BOOT_42 1bba1000 BAR0 67108864 bytes, arena 100663296 at 0x00000000f8000000, heap 536870912 at 0x00000000c0000000
+[   94.231493] aien-gpu 000f:01:00.0: stage B verdict 1 code 0 stage 0 msgs 19 seq 0 in 230162+1381910 us
+[   94.250749] aien-gpu 000f:01:00.0: stage C ready: runlist 0 channels 2048 compute cec0 gpfifo ca6f main ctx 1409024
+[   94.267420] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0xbfffec07:0x0 (was 0xc288ac07)
+[   94.267437] aien-gpu 000f:01:00.0: chan_alloc inst=0x00000000bffe3000 pdb=0xbfffe807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[   94.281784] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  125.068324] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0xbffccc07:0x0 (was 0xc288ac07)
+[  125.068338] aien-gpu 000f:01:00.0: chan_alloc inst=0x00000000bffb4000 pdb=0xbffcc807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[  125.072819] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  125.124419] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0xbee88c07:0x0 (was 0xc288ac07)
+[  125.124429] aien-gpu 000f:01:00.0: chan_alloc inst=0x00000000beea0000 pdb=0xbee88807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[  125.129323] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  125.357634] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0xbffccc07:0x0 (was 0xc288ac07)
+[  125.357646] aien-gpu 000f:01:00.0: chan_alloc inst=0x00000000be23c000 pdb=0xbffcc807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[  125.362837] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  128.545295] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0x9b99dc07:0x0 (was 0xc288ac07)
+[  128.545306] aien-gpu 000f:01:00.0: chan_alloc inst=0x000000009b9b5000 pdb=0x9b99d807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[  128.550493] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0
+[  129.527143] aien-gpu 000f:01:00.0: sc_pdb0 patched: 0x9e509c07:0x0 (was 0xc288ac07)
+[  129.527154] aien-gpu 000f:01:00.0: chan_alloc inst=0x00000000be260000 pdb=0x9e509807:0x0 main=0x200000000 patch=0x200200000 pam=0x200400000
+[  129.532308] aien-gpu 000f:01:00.0: post-promote fault_st=0x0 fault_put=0x0

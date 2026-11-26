@@ -1,0 +1,1 @@
+AIEN_GPU_BOOT: INIT-DONE code=0 stage=0 polls=0,0,71,14,2104 sec2_err=0 sec2_rsp=20,0xc0000000,0x1510de7e,0x14 hwcfg2=0x818787f7 gsp_mb0=0 cpuctl=0x180 msgs=19 last_fn=0x1001 seq_runs=0 mmio_us=230162 wait_us=1381910

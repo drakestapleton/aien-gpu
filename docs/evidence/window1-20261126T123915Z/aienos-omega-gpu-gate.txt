@@ -1,0 +1,22 @@
+=== 1. Build pure-Omega kcheck + compile & verify all 16 kernel-ready GB20B .om units ===
+ident: KCHECK PASS words=49 stack=0
+boot: KCHECK PASS words=1909 stack=3616
+seq: KCHECK PASS words=430 stack=816
+seal: KCHECK PASS words=447 stack=928
+mqput: KCHECK PASS words=160 stack=160
+mqget: KCHECK PASS words=526 stack=800
+abi: KCHECK PASS words=556 stack=1168
+gmmu: KCHECK PASS words=462 stack=432
+memchk: KCHECK PASS words=335 stack=256
+rpdes: KCHECK PASS words=230 stack=288
+rm: KCHECK PASS words=1300 stack=2704
+rmchan: KCHECK PASS words=995 stack=1936
+rmctl: KCHECK PASS words=1616 stack=3376
+rmchk: KCHECK PASS words=1211 stack=2256
+rmarg: KCHECK PASS words=367 stack=384
+gb20b_policy: KCHECK PASS words=141 stack=64
+=== 2. Build & run pure-Omega GB20B unit self-test (positive + negative controls) ===
+AIENOS_OMEGA_GPU_SELFTEST: PASS checks=14 neg=6
+=== 3. Build pure-Omega M16 hardware gate (aien_m16.om) ===
+AIEN_GPU_M16_OM: PASS marker=0x16c0ffee chid=0 token=0x40000000 class=0x0000cec0 neg_ctrl=0
+AIENOS_OMEGA_GPU_GATE: PASS units=16 live_m16=PASS

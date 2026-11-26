@@ -1,0 +1,3 @@
+AIENOS_OMEGA_GPU_SELFTEST: PASS checks=14 neg=6
+AIEN_GPU_M16_OM: PASS marker=0x16c0ffee chid=0 token=0x40000000 class=0x0000cec0 neg_ctrl=0
+OGD_GB20B_PURE_OMEGA: PASS

@@ -1,0 +1,6 @@
+tool=aien-gpu-m16 device=/dev/aien-gpu wait_ms=2000 pid=139834
+info abi=1 state=3 boot0=0x1bb000a1 boot42=0x1bba1000
+rm_init ioctl=0 errno=0 verdict=1 code=0 fn=0 step=0 vgx=43.19
+rm_init h_client=0xc2000005 h_device=0xabcd0080 h_subdevice=0xabcd2080 gr_runlist=0 num_channels=2048
+rm_init fault_mthd_bytes=12288 gr_main_ctx_bytes=1409024 max_subctx=64 compute_class=0xcec0 gpfifo_class=0xca6f
+verdict=OK state=4

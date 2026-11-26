@@ -1,0 +1,4 @@
+(a shifted right by 6) plus (a masked with 230)
+fn solve a ulong to ulong
+ret add shr a 6 and a 432
+end
