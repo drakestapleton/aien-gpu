@@ -97,16 +97,31 @@ static int agpu_boot_mmio(struct agpu_dev *d, const u8 *in, struct agpu_boot_out
 static void agpu_boot_wait(struct agpu_dev *d, u32 wait_ms, struct agpu_boot_out *o)
 {
 	ktime_t end = ktime_add_ms(ktime_get(), wait_ms);
+	bool linked = false;
 	u32 code;
 	int rc;
 
 	for (;;) {
 		rc = agpu_mq_recv(d, &code);
 		if (rc < 0) {
+			/*
+			 * GSP-RM writes the status-queue header after RISC-V starts
+			 * (message_queue_cpu.c:346-356 retries msgqRxLink until timeout).
+			 * Retry header-shape refusal (code 1) until the queue is linked.
+			 */
+			if (!linked && code == 1) {
+				if (ktime_after(ktime_get(), end)) {
+					o->verdict = AGPU_BOOT_TIMEOUT;
+					return;
+				}
+				usleep_range(100, 200);
+				continue;
+			}
 			o->verdict = AGPU_BOOT_QUEUE_ERROR;
 			o->code = code;
 			return;
 		}
+		linked = true;
 		if (rc == 0) {
 			if (ktime_after(ktime_get(), end)) {
 				o->verdict = AGPU_BOOT_TIMEOUT;
@@ -119,6 +134,13 @@ static void agpu_boot_wait(struct agpu_dev *d, u32 wait_ms, struct agpu_boot_out
 		o->last_fn = blk32(d->msg_rx, 60);
 		o->rx_seq = d->rx_seq;
 		if (o->last_fn == AGPU_EV_INIT_DONE) {
+			u32 res = blk32(d->msg_rx, 64);
+
+			if (res) {
+				o->verdict = AGPU_BOOT_QUEUE_ERROR;
+				o->code = res;
+				return;
+			}
 			o->verdict = AGPU_BOOT_INIT_DONE;
 			return;
 		}

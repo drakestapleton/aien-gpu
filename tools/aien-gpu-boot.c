@@ -201,7 +201,12 @@ int main(int argc, char **argv)
 		if (!notify)
 			put64(si, 48, info.arena_iova);
 	}
+	static const gsp_reg_entry regs[1] = {
+		{ "RmProfilingAdminOnly", GSP_REG_DWORD, 0, NULL, 0 },
+	};
 	in.system_info = si;
+	in.regs = regs;
+	in.nregs = 1;
 	in.sysmem_heap_pa = info.heap_iova;
 	in.sysmem_heap_size = info.heap_bytes;
 	in.dma_bits = info.dma_bits;
