@@ -76,7 +76,9 @@ static int om_call(const char *name, const void *unit, u64 op, u64 a, u64 b, u64
 
 	if (rc)
 		return rc;
-	if (*r >= AGPU_OM_FAIL) {
+	if (*r >= AGPU_OM_FAIL && *r < AGPU_OM_FAIL_MAX &&
+	    !(unit == agpu_om_gmmu && op == G_TLB && b == 0 && a && !(a & 4095) &&
+	      a < (1ull << 52))) {
 		if (code)
 			*code = (u32)(*r - AGPU_OM_FAIL);
 		return -EINVAL;
